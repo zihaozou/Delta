@@ -42,6 +42,7 @@
 		FA1B1AA92590A96000660CD7 /* HASH.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HASH.h; sourceTree = "<group>"; };
 		FA1B1AAA2590A96000660CD7 /* HASH.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = HASH.c; sourceTree = "<group>"; };
 		FA1B1AAE25918F3400660CD7 /* uthash.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = uthash.h; sourceTree = "<group>"; };
+		FA1B1AB02591E16A00660CD7 /* utlist.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utlist.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -102,6 +103,7 @@
 		FA1B1AAD25918F0D00660CD7 /* UTHASH */ = {
 			isa = PBXGroup;
 			children = (
+				FA1B1AB02591E16A00660CD7 /* utlist.h */,
 				FA1B1AAE25918F3400660CD7 /* uthash.h */,
 			);
 			path = UTHASH;

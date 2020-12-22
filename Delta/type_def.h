@@ -10,11 +10,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-
+#include "uthash.h"
+#include "utlist.h"
 #define delta_min(a,b)      (a<b)?a:b
 #define delta_max(a,b)      (a>b)?a:b
 
-
+#define SOURCE_WINDOW_SIZE 4096
+#define MAX_BLOCK_NUMBER 8
 
 
 typedef enum delta_return{
@@ -56,12 +58,12 @@ typedef struct _stream{
 
 typedef struct _target{
     struct _target_file *TARGET_FILE;
-    struct _target_window **target_window_list;
+    struct _target_window **TARGET_WINDOW_LIST;
     uint32_t WINDOW_COUNT;
 }target;
 typedef struct _target_file{
     FILE *FILE_INSTANCE;
-    char *FILE_NAME;
+    const char *FILE_NAME;
     size_t FILE_SIZE;
 }target_file;
 typedef struct _target_window{
@@ -77,20 +79,20 @@ typedef struct _target_window{
 
 
 typedef struct _source{
-    struct _source_file *source_file;
-    struct _source_window *source_window;
+    struct _source_file *SOURCE_FILE;
+    struct _source_window *SOURCE_WINDOW;
     //hash table
 }source;
 
 typedef struct _source_file{
     FILE *FILE_INSTANCE;
-    char *FILE_NAME;
-    size_t *FILE_SIZE;
+    const char *FILE_NAME;
+    size_t FILE_SIZE;
 }source_file;
 
 typedef struct _source_window{
     size_t WINDOW_SIZE;
-    uint32_t BLOCK_COUNT;
+    //uint32_t BLOCK_COUNT;
     struct _block *CURRENT_BLOCK;
     struct _lru_manager *LRU_MANAGER;
 }source_window;
@@ -99,6 +101,9 @@ typedef struct _block{
     uint32_t BLOCK_NUMBER;
     char *DATA;
     size_t DATA_SIZE;
+    struct _block *PREV;
+    struct _block *NEXT;
+    UT_hash_handle hh;
 }block;
 
 typedef struct _instruction{
@@ -114,6 +119,10 @@ typedef struct _instruction_node{
     data_addr DATA_or_ADDR;
 }instruction_node;
 
+
+typedef struct _source_hash{
+    
+}source_hash;
 
 
 
