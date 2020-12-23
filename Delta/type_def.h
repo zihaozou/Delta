@@ -37,7 +37,10 @@ typedef union _data_addr{
     char *data;
     uint32_t addr;
 }data_addr;
-
+typedef enum _lru_mode{
+    SINGLE,
+    NORMAL
+}lru_mode;
 
 
 

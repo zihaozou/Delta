@@ -12,7 +12,6 @@
 		FA1B1A9F2590A88500660CD7 /* TARGET.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1B1A9E2590A88500660CD7 /* TARGET.c */; };
 		FA1B1AA32590A90400660CD7 /* SOURCE.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1B1AA22590A90400660CD7 /* SOURCE.c */; };
 		FA1B1AA72590A93600660CD7 /* INSTRUCTION.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1B1AA62590A93600660CD7 /* INSTRUCTION.c */; };
-		FA1B1AAB2590A96000660CD7 /* HASH.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1B1AAA2590A96000660CD7 /* HASH.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -39,10 +38,7 @@
 		FA1B1AA22590A90400660CD7 /* SOURCE.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SOURCE.c; sourceTree = "<group>"; };
 		FA1B1AA52590A93600660CD7 /* INSTRUCTION.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = INSTRUCTION.h; sourceTree = "<group>"; };
 		FA1B1AA62590A93600660CD7 /* INSTRUCTION.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = INSTRUCTION.c; sourceTree = "<group>"; };
-		FA1B1AA92590A96000660CD7 /* HASH.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HASH.h; sourceTree = "<group>"; };
-		FA1B1AAA2590A96000660CD7 /* HASH.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = HASH.c; sourceTree = "<group>"; };
 		FA1B1AAE25918F3400660CD7 /* uthash.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = uthash.h; sourceTree = "<group>"; };
-		FA1B1AB02591E16A00660CD7 /* utlist.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = utlist.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,8 +90,6 @@
 				FA1B1AA22590A90400660CD7 /* SOURCE.c */,
 				FA1B1AA52590A93600660CD7 /* INSTRUCTION.h */,
 				FA1B1AA62590A93600660CD7 /* INSTRUCTION.c */,
-				FA1B1AA92590A96000660CD7 /* HASH.h */,
-				FA1B1AAA2590A96000660CD7 /* HASH.c */,
 			);
 			path = CLASS;
 			sourceTree = "<group>";
@@ -103,7 +97,6 @@
 		FA1B1AAD25918F0D00660CD7 /* UTHASH */ = {
 			isa = PBXGroup;
 			children = (
-				FA1B1AB02591E16A00660CD7 /* utlist.h */,
 				FA1B1AAE25918F3400660CD7 /* uthash.h */,
 			);
 			path = UTHASH;
@@ -166,7 +159,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				FA1B1A9F2590A88500660CD7 /* TARGET.c in Sources */,
-				FA1B1AAB2590A96000660CD7 /* HASH.c in Sources */,
 				FA1B1A8F258C4D9000660CD7 /* main.c in Sources */,
 				FA1B1AA32590A90400660CD7 /* SOURCE.c in Sources */,
 				FA1B1AA72590A93600660CD7 /* INSTRUCTION.c in Sources */,
