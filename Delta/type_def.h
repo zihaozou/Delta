@@ -11,13 +11,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "uthash.h"
-#include "utlist.h"
+#include "crc16speed.h"
+//#include "utlist.h"
 #define delta_min(a,b)      (a<b)?a:b
 #define delta_max(a,b)      (a>b)?a:b
 
 #define SOURCE_WINDOW_SIZE 4096
 #define MAX_BLOCK_NUMBER 8
-
+#define CRC_LEN 8
 
 typedef enum delta_return{
     D_OK,
@@ -84,7 +85,7 @@ typedef struct _target_window{
 typedef struct _source{
     struct _source_file *SOURCE_FILE;
     struct _source_window *SOURCE_WINDOW;
-    //hash table
+    struct _source_hash *SOURCE_HASH;
 }source;
 
 typedef struct _source_file{
@@ -109,6 +110,19 @@ typedef struct _block{
     UT_hash_handle hh;
 }block;
 
+typedef struct _lru_manager{
+    lru_mode MODE;
+    uint64_t BLOCK_COUNT;
+    uint32_t BLOCK_IN_POOL;
+    char source_window_pool[SOURCE_WINDOW_SIZE];
+    block blk_in_pool[MAX_BLOCK_NUMBER];
+    block *HEAD;
+    block *TAIL;
+    block *IN_POOL_BLOCK_HASH;
+}lru_manager;
+
+
+
 typedef struct _instruction{
     uint32_t instruction_count;
     struct _instruction *HEAD;
@@ -124,9 +138,14 @@ typedef struct _instruction_node{
 
 
 typedef struct _source_hash{
-    
+    uint16_t crc;
+    uint32_t cnt;
+    struct _source_position *head;
+    UT_hash_handle hh;
 }source_hash;
-
-
+typedef struct _source_position{
+    struct _source_position *next;
+    uint32_t position;
+}source_position;
 
 #endif /* type_def_h */

@@ -40,9 +40,11 @@
 
 
 source *create_source(void);
-D_RT set_file(source *src, const char *file_name);
+D_RT set_src_file(source *src, const char *file_name);
 //D_RT set_hash_table()
 D_RT init_window(source *src);
 D_RT global_source_hash(source *src);
 char get_char_at(source *src,uint32_t position);
+D_RT get_block(source *src,uint32_t blk_no);
+D_RT get_n_char_at(source *src,uint32_t position, char buffer[]);
 #endif /* SOURCE_h */

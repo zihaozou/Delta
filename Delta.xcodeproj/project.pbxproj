@@ -12,6 +12,8 @@
 		FA1B1A9F2590A88500660CD7 /* TARGET.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1B1A9E2590A88500660CD7 /* TARGET.c */; };
 		FA1B1AA32590A90400660CD7 /* SOURCE.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1B1AA22590A90400660CD7 /* SOURCE.c */; };
 		FA1B1AA72590A93600660CD7 /* INSTRUCTION.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1B1AA62590A93600660CD7 /* INSTRUCTION.c */; };
+		FA1F19992593244700E46227 /* crcspeed.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1F19962593244700E46227 /* crcspeed.c */; };
+		FA1F199A2593244700E46227 /* crc16speed.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1F19972593244700E46227 /* crc16speed.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -39,6 +41,10 @@
 		FA1B1AA52590A93600660CD7 /* INSTRUCTION.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = INSTRUCTION.h; sourceTree = "<group>"; };
 		FA1B1AA62590A93600660CD7 /* INSTRUCTION.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = INSTRUCTION.c; sourceTree = "<group>"; };
 		FA1B1AAE25918F3400660CD7 /* uthash.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = uthash.h; sourceTree = "<group>"; };
+		FA1F19952593244700E46227 /* crc16speed.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = crc16speed.h; sourceTree = "<group>"; };
+		FA1F19962593244700E46227 /* crcspeed.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = crcspeed.c; sourceTree = "<group>"; };
+		FA1F19972593244700E46227 /* crc16speed.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = crc16speed.c; sourceTree = "<group>"; };
+		FA1F19982593244700E46227 /* crcspeed.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = crcspeed.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +77,7 @@
 		FA1B1A8D258C4D9000660CD7 /* Delta */ = {
 			isa = PBXGroup;
 			children = (
+				FA1F19942593241000E46227 /* CRC */,
 				FA1B1AAD25918F0D00660CD7 /* UTHASH */,
 				FA1B1A982590A85400660CD7 /* CLASS */,
 				FA1B1A8E258C4D9000660CD7 /* main.c */,
@@ -100,6 +107,17 @@
 				FA1B1AAE25918F3400660CD7 /* uthash.h */,
 			);
 			path = UTHASH;
+			sourceTree = "<group>";
+		};
+		FA1F19942593241000E46227 /* CRC */ = {
+			isa = PBXGroup;
+			children = (
+				FA1F19972593244700E46227 /* crc16speed.c */,
+				FA1F19952593244700E46227 /* crc16speed.h */,
+				FA1F19962593244700E46227 /* crcspeed.c */,
+				FA1F19982593244700E46227 /* crcspeed.h */,
+			);
+			path = CRC;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -158,6 +176,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA1F199A2593244700E46227 /* crc16speed.c in Sources */,
+				FA1F19992593244700E46227 /* crcspeed.c in Sources */,
 				FA1B1A9F2590A88500660CD7 /* TARGET.c in Sources */,
 				FA1B1A8F258C4D9000660CD7 /* main.c in Sources */,
 				FA1B1AA32590A90400660CD7 /* SOURCE.c in Sources */,

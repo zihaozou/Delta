@@ -9,18 +9,6 @@
 
 ///LRU_MANAGER
 
-typedef struct _lru_manager{
-    uint64_t BLOCK_COUNT;
-    uint32_t BLOCK_IN_POOL;
-    char source_window_pool[SOURCE_WINDOW_SIZE];
-    block blk_in_pool[MAX_BLOCK_NUMBER];
-    block *HEAD;
-    block *TAIL;
-    block *IN_POOL_BLOCK_HASH;
-}lru_manager;
-
-
-
 /// init_lru:
 /// 这个函数初始化lru队列，在这里我简单讲一下lru工作原理：lru由一个双向链表和一个哈希表组成。链表遵循FIFO原理，新进的BLO
 /// CK被放到最前列，最近未使用的block被推向最后列。哈希表则记录链表中的元素的位置，以达到O(1) 的查询时间。
@@ -42,11 +30,12 @@ D_RT init_lru(lru_manager *lru,lru_mode mode,FILE *srcfile,size_t filesize){
         printf("\nERROR: lru hash uninitialized to NULL\n");
         return D_ERROR;
     }
+    lru->MODE=mode;
     //lru->IN_POOL_BLOCK_HASH=NULL;
     if(mode==SINGLE){
         //直接读满整个window，然后整个文件作一个block
         rewind(srcfile);
-        size_t size=fread((void *)lru->source_window_pool,filesize , 1, srcfile);
+        size_t size=fread((void *)lru->source_window_pool, 1, filesize, srcfile);
         if(size!=filesize){
             printf("\nERROR: error during reading source file, mode=SINGLE\n");
             return D_ERROR;
@@ -64,7 +53,7 @@ D_RT init_lru(lru_manager *lru,lru_mode mode,FILE *srcfile,size_t filesize){
     }else{
         //先读满整个WINDOW
         rewind(srcfile);
-        size_t size=fread((void *)lru->source_window_pool,SOURCE_WINDOW_SIZE , 1, srcfile);
+        size_t size=fread((void *)lru->source_window_pool, 1, SOURCE_WINDOW_SIZE, srcfile);
         if(size!=SOURCE_WINDOW_SIZE){
             printf("\nERROR: error during reading source file, mode=NORMAL\n");
             return D_ERROR;
@@ -143,7 +132,7 @@ D_RT get_block(source *src,uint32_t blk_no){
     if(src->SOURCE_WINDOW->CURRENT_BLOCK->BLOCK_NUMBER==blk_no)return D_OK;
     
     
-    HASH_FIND_INT(lru->IN_POOL_BLOCK_HASH, &blk_no, temp);
+    HASH_FIND_INT(lru->IN_POOL_BLOCK_HASH, &blk_no, temp);//查找lru中是否存在block
     if(temp==NULL){//lru中不存在所需的块
         size_t data_size;
         uint32_t data_position=(SOURCE_WINDOW_SIZE/MAX_BLOCK_NUMBER)*blk_no;
@@ -156,7 +145,7 @@ D_RT get_block(source *src,uint32_t blk_no){
         }else data_size=SOURCE_WINDOW_SIZE/MAX_BLOCK_NUMBER;
         memset(temp->DATA, 0, SOURCE_WINDOW_SIZE/MAX_BLOCK_NUMBER);
         fseek(src->SOURCE_FILE->FILE_INSTANCE, data_position, SEEK_SET);
-        size_t size=fread((void *)temp->DATA,data_size , 1, src->SOURCE_FILE->FILE_INSTANCE);
+        size_t size=fread((void *)temp->DATA, 1, data_size, src->SOURCE_FILE->FILE_INSTANCE);
         if(size!=data_size){
             printf("\nERROR: error during reading source file in get block, block number=%d\n",blk_no);
             return D_ERROR;
@@ -177,9 +166,6 @@ D_RT get_block(source *src,uint32_t blk_no){
 block *get_top_block(lru_manager *lru){
     return lru->HEAD;
 }
-
-
-
 
 
 
@@ -210,7 +196,7 @@ source *create_source(void){
     return src;
 }
 
-D_RT set_file(source *src, const char *file_name){
+D_RT set_src_file(source *src, const char *file_name){
     if(src==NULL){
         printf("\nERROR: source uninitilized\n");
         return D_ERROR;
@@ -265,3 +251,94 @@ D_RT init_window(source *src){
     return D_OK;
 }
 
+void add_position(source_hash *h,int x){
+    source_position *p=(source_position *)malloc(sizeof(source_position));
+    p->position=x;
+    p->next=h->head;
+    h->head=p;
+    h->cnt++;
+    return;
+}
+//source_hash *SOURCE_HASH_LIST;
+/// global_source_hash:
+/// 全局的源文件哈希。
+/// @param src SOURCE实例
+D_RT global_source_hash(source *src){
+    char buffer[CRC_LEN];
+    uint16_t crc;
+    size_t filesize=src->SOURCE_FILE->FILE_SIZE;
+    crc16speed_init();
+    for(int x=0;x<filesize-CRC_LEN;x++){
+        if (get_n_char_at(src, x, buffer)!=D_OK)exit(0);
+        crc=crc16speed(0, buffer, CRC_LEN);
+        source_hash *s;
+        HASH_FIND_INT(src->SOURCE_HASH, &crc, s);
+        if (s==NULL) {
+            s = (source_hash *)malloc(sizeof(source_hash));
+            s->cnt=0;
+            s->head=NULL;
+            add_position(s,x);
+            HASH_ADD_INT(src->SOURCE_HASH, crc, s);
+        }else{
+            add_position(s, x);
+        }
+    }
+    return D_OK;
+}
+
+
+D_RT get_n_char_at(source *src,uint32_t position, char buffer[]){
+    lru_manager *lru=src->SOURCE_WINDOW->LRU_MANAGER;
+    uint64_t init_blk_size=src->SOURCE_WINDOW->WINDOW_SIZE/
+    src->SOURCE_WINDOW->LRU_MANAGER->BLOCK_IN_POOL;
+    if(position+CRC_LEN-1>=src->SOURCE_FILE->FILE_SIZE){
+        printf("\nERROR: exceeds file size\n");
+        return D_ERROR;
+    }else if(CRC_LEN>init_blk_size){
+        printf("\nERROR: cannot read morethan one block\n");
+        return D_ERROR;
+    }
+    //需要分辨lru的mode再决定
+    if(lru->MODE==SINGLE){
+        int x,y;
+        for(x=position, y=0;y<CRC_LEN;x++,y++){
+            buffer[y]=src->SOURCE_WINDOW->CURRENT_BLOCK->DATA[x];
+        }
+    }else{
+        uint32_t blk_no=position/(init_blk_size);
+        uint32_t local_position=position%(init_blk_size);
+        if (get_block(src, blk_no)!=D_OK)exit(0);
+        if (local_position+CRC_LEN-1>=init_blk_size){
+            uint8_t compensate=(uint8_t)(local_position+CRC_LEN-1-init_blk_size+1);
+            int x,y;
+            for(x=local_position, y=0;x<init_blk_size;x++,y++){
+                buffer[y]=src->SOURCE_WINDOW->CURRENT_BLOCK->DATA[x];
+            }
+            if (get_block(src, blk_no+1)!=D_OK)exit(0);
+            for(x=0;x<compensate;x++,y++){
+                buffer[y]=src->SOURCE_WINDOW->CURRENT_BLOCK->DATA[x];
+            }
+        }else{
+            int x,y;
+            for(x=local_position, y=0;y<CRC_LEN;x++,y++){
+                buffer[y]=src->SOURCE_WINDOW->CURRENT_BLOCK->DATA[x];
+            }
+        }
+    }
+    return D_OK;
+}
+
+char get_char_at(source *src,uint32_t position){
+    //lru_manager *lru=src->SOURCE_WINDOW->LRU_MANAGER;
+    uint64_t init_blk_size=src->SOURCE_WINDOW->WINDOW_SIZE/
+    src->SOURCE_WINDOW->LRU_MANAGER->BLOCK_IN_POOL;
+    if(position+CRC_LEN-1>=src->SOURCE_FILE->FILE_SIZE){
+        printf("\nERROR: exceeds file size\n");
+        exit(0);
+    }
+    uint32_t blk_no=position/(init_blk_size);
+    uint32_t local_position=position%(init_blk_size);
+    if (get_block(src, blk_no)!=D_OK)exit(0);
+    return src->SOURCE_WINDOW->CURRENT_BLOCK->DATA[local_position];
+    
+}
