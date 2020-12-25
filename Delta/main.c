@@ -4,11 +4,8 @@
 //
 //  Created by 邹子豪 on 12/18/20.
 //
-
-#include "type_def.h"
-#include "crc16speed.h"
 #include "SOURCE.h"
-
+#include "INSTRUCTION.h"
 //static source *Source;
 int main(int argc, const char * argv[]) {
     //crc16speed_init();
@@ -20,6 +17,10 @@ int main(int argc, const char * argv[]) {
     //char buffer[8]={0};
     //get_n_char_at(Source, 509, buffer);
     global_source_hash(Source);
+    instruction *Inst=create_instruction();
+    instruction_node *node1=new_inst_node(NULL, COPY, 5, 10, NULL, 5);
+    instruction_node *node2=new_inst_node(node1, COPY, 13, 10, NULL, 100);
+    add_instructions(Inst, node1, 2);
     // insert code here...
     printf("Hello, World!\n");
     return 0;

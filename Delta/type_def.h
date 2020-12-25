@@ -13,8 +13,8 @@
 #include "uthash.h"
 #include "crc16speed.h"
 //#include "utlist.h"
-#define delta_min(a,b)      (a<b)?a:b
-#define delta_max(a,b)      (a>b)?a:b
+#define delta_min(a,b)      ((a)<(b))?(a):(b)
+#define delta_max(a,b)      ((a)>(b))?(a):(b)
 
 #define SOURCE_WINDOW_SIZE 4096
 #define MAX_BLOCK_NUMBER 8
@@ -62,8 +62,8 @@ typedef struct _stream{
 
 typedef struct _target{
     struct _target_file *TARGET_FILE;
-    struct _target_window **TARGET_WINDOW_LIST;
-    uint32_t WINDOW_COUNT;
+    struct _target_window *TARGET_WINDOW;
+    uint16_t WINDOW_COUNT;
 }target;
 typedef struct _target_file{
     FILE *FILE_INSTANCE;
@@ -74,7 +74,8 @@ typedef struct _target_window{
     uint32_t WIN_NUMBER;
     char *BUFFER;
     size_t BUFFER_SIZE;
-    uint32_t START_POSITION;
+    uint32_t START_POSITION;//在目标文件中的起始位置
+    uint32_t TOTAL_RAM_COST;//源文件片段+目标文件片段加起来的长度。
     struct _instruction *INSTRUCTION;
 }target_window;
 
@@ -124,14 +125,18 @@ typedef struct _lru_manager{
 
 
 typedef struct _instruction{
-    uint32_t instruction_count;
-    struct _instruction *HEAD;
-    struct _instruction *TAIL;
+    uint8_t FIRST_COPY;
+    uint32_t INSTRUCTION_COUNT;
+    uint32_t START_POSITION;//在源文件中的起始位置
+    uint32_t LENGTH;//指令在源文件中的跨度
+    struct _instruction_node *HEAD;
+    struct _instruction_node *TAIL;
 }instruction;
 typedef struct _instruction_node{
     struct _instruction_node *PREV;
     struct _instruction_node *NEXT;
     inst_type INST_TYPE;
+    uint32_t POSITION;//此指令在源文件中的起始位置
     uint32_t SIZE;
     data_addr DATA_or_ADDR;
 }instruction_node;

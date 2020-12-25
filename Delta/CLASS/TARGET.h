@@ -7,7 +7,9 @@
 
 #ifndef TARGET_h
 #define TARGET_h
+#include "type_def.h"
 
-#include <stdio.h>
+
+
 
 #endif /* TARGET_h */

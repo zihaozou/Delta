@@ -309,7 +309,7 @@ D_RT get_n_char_at(source *src,uint32_t position, char buffer[]){
         uint32_t local_position=position%(init_blk_size);
         if (get_block(src, blk_no)!=D_OK)exit(0);
         if (local_position+CRC_LEN-1>=init_blk_size){
-            uint8_t compensate=(uint8_t)(local_position+CRC_LEN-1-init_blk_size+1);
+            uint8_t compensate=(uint8_t)(local_position+CRC_LEN-init_blk_size);
             int x,y;
             for(x=local_position, y=0;x<init_blk_size;x++,y++){
                 buffer[y]=src->SOURCE_WINDOW->CURRENT_BLOCK->DATA[x];
