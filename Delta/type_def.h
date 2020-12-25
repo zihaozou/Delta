@@ -19,6 +19,9 @@
 #define SOURCE_WINDOW_SIZE 4096
 #define MAX_BLOCK_NUMBER 8
 #define CRC_LEN 8
+#define DEFAULT_TARGET_WIN_SIZE 2048
+
+
 
 typedef enum delta_return{
     D_OK,
@@ -50,8 +53,8 @@ typedef enum _lru_mode{
 
 
 typedef struct _stream{
-    uint32_t INPUT_REMAINING;
-    uint32_t INPUT_POSITION;
+    uint64_t INPUT_REMAINING;
+    uint64_t INPUT_POSITION;
     struct _target *TARGET;
     struct _source *SOURCE;
     struct _target_window *CURRENT_WINDOW;
@@ -63,7 +66,7 @@ typedef struct _stream{
 typedef struct _target{
     struct _target_file *TARGET_FILE;
     struct _target_window *TARGET_WINDOW;
-    uint16_t WINDOW_COUNT;
+    //uint16_t WINDOW_COUNT;
 }target;
 typedef struct _target_file{
     FILE *FILE_INSTANCE;
@@ -71,11 +74,11 @@ typedef struct _target_file{
     size_t FILE_SIZE;
 }target_file;
 typedef struct _target_window{
-    uint32_t WIN_NUMBER;
+    int WIN_NUMBER;
     char *BUFFER;
     size_t BUFFER_SIZE;
-    uint32_t START_POSITION;//在目标文件中的起始位置
-    uint32_t TOTAL_RAM_COST;//源文件片段+目标文件片段加起来的长度。
+    uint64_t START_POSITION;//在目标文件中的起始位置
+    uint64_t TOTAL_RAM_COST;//源文件片段+目标文件片段加起来的长度。
     struct _instruction *INSTRUCTION;
 }target_window;
 

@@ -8,8 +8,10 @@
 #ifndef TARGET_h
 #define TARGET_h
 #include "type_def.h"
-
-
+#include "INSTRUCTION.h"
+target *create_target(void);
+D_RT set_tgt_file(target *tgt,const char *filename);
+D_RT set_window(target *tgt);
 
 
 #endif /* TARGET_h */

@@ -150,6 +150,8 @@ D_RT get_block(source *src,uint32_t blk_no){
             printf("\nERROR: error during reading source file in get block, block number=%d\n",blk_no);
             return D_ERROR;
         }//读入新的数据
+        //[*]TODO: 改变datasize
+        temp->DATA_SIZE=data_size;
         HASH_ADD_INT(src->SOURCE_WINDOW->LRU_MANAGER->IN_POOL_BLOCK_HASH, BLOCK_NUMBER, temp);//把块重新放入hash中，此时哈希值已经更新
         src->SOURCE_WINDOW->CURRENT_BLOCK=temp;//更新current block
     }else{//队列中存在所需的块，则放到最前列

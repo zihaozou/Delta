@@ -17,5 +17,6 @@ instruction_node *new_inst_node(instruction_node *prev/*可选*/,inst_type type,
                                 uint32_t size,
                                 char *data,uint32_t addr);
 D_RT instructions_mediator(instruction *inst, instruction_node *inst_node);
-D_RT delete_instruction(instruction *inst, instruction_node *inst_node);
+D_RT delete_instruction_node(instruction *inst, instruction_node *inst_node);
+D_RT delete_inst_list(instruction *inst);//TODO: 实现删除操作
 #endif /* INSTRUCTION_h */

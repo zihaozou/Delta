@@ -17,6 +17,19 @@ instruction *create_instruction(void){
     return inst;
     
 }
+D_RT delete_inst_list(instruction *inst){
+    instruction_node *curr;
+    instruction_node *next;
+    curr=inst->HEAD;
+        
+    while(curr!=NULL){
+        next=curr->NEXT;
+        free(curr);
+        curr=next;
+    }
+    free(inst);
+    return D_OK;
+}
 /// add_instructions
 /// 为已有的instruction list添加新的指令，可以为数个指令
 /// @param inst 指令list实例
@@ -50,7 +63,11 @@ D_RT add_instructions(instruction *inst, instruction_node *inst_node,int number)
     }
     return D_OK;
 }
-D_RT delete_instruction(instruction *inst, instruction_node *inst_node){
+/// delete_instruction：
+/// 删除instruction node
+/// @param inst <#inst description#>
+/// @param inst_node <#inst_node description#>
+D_RT delete_instruction_node(instruction *inst, instruction_node *inst_node){
     if(inst_node->PREV!=NULL)inst_node->PREV->NEXT=inst_node->NEXT;
     if(inst_node->NEXT!=NULL)inst_node->NEXT->PREV=inst_node->PREV;
     if(inst->HEAD==inst_node)inst->HEAD=inst_node->NEXT;
@@ -93,14 +110,14 @@ D_RT instructions_mediator(instruction *inst, instruction_node *inst_node){
                 case ADD:
                 case RUN://考虑直接删除还是部分覆盖
                     if(inst_node->POSITION<=temp2->POSITION){
-                        delete_instruction(inst,temp2);//直接删除
+                        delete_instruction_node(inst,temp2);//直接删除
                     }else{
                         temp2->SIZE=temp2->SIZE-(endpoint-inst_node->POSITION+1);
                     }
                     break;
                 case COPY:
                     if(inst_node->POSITION<=temp2->POSITION){//完全覆盖了原COPY指令，删除原COPY
-                        delete_instruction(inst, temp2);
+                        delete_instruction_node(inst, temp2);
                     }else{//没有完全覆盖，修改新COPY指令的target起始地址和size和addr
                         uint32_t cover=endpoint-inst_node->POSITION+1;
                         inst_node->SIZE-=cover;
