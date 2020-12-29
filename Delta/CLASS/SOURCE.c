@@ -23,7 +23,7 @@ D_RT init_lru(lru_manager *lru,lru_mode mode,FILE *srcfile,size_t filesize){
     if(lru==NULL){
         printf("\nERROR: lru manager instance is NULL\n");
         return D_ERROR;
-    }else if(SOURCE_WINDOW_SIZE%MAX_BLOCK_NUMBER!=0){
+    }else if(SOURCE_WINDOW_SIZE%MAX_BLOCK_NUMBER!=/* DISABLES CODE */ (0)){
         printf("\nERROR: the max block number must be a factor of source window size\n");
         return D_ERROR;
     }else if(lru->IN_POOL_BLOCK_HASH!=NULL){
@@ -274,13 +274,14 @@ D_RT global_source_hash(source *src){
         if (get_n_char_at(src, x, buffer)!=D_OK)exit(0);
         crc=crc16speed(0, buffer, CRC_LEN);
         source_hash *s;
-        HASH_FIND_INT(src->SOURCE_HASH, &crc, s);
+        HASH_FIND(hh, src->SOURCE_HASH, &crc, 2, s);
         if (s==NULL) {
             s = (source_hash *)malloc(sizeof(source_hash));
+            s->crc=crc;
             s->cnt=0;
             s->head=NULL;
             add_position(s,x);
-            HASH_ADD_INT(src->SOURCE_HASH, crc, s);
+            HASH_ADD(hh, src->SOURCE_HASH, crc, 2, s);
         }else{
             add_position(s, x);
         }

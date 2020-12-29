@@ -58,6 +58,13 @@ D_RT add_instructions(instruction *inst, instruction_node *inst_node,int number)
             }
         }
         inst->INSTRUCTION_COUNT++;//增进指令计数
+        if(inst_node->INST_TYPE==COPY){
+            printf("\n*******************\nNEW INSTRUCTION: a new instruction has added\nTYPE:COPY\nPOSITION:%llu\nSIZE:%llu\nADDR:%llu\n*******************\n",inst_node->POSITION,inst_node->SIZE,
+                   inst_node->DATA_or_ADDR.addr);
+        }else{
+            printf("\n*******************\nNEW INSTRUCTION: a new instruction has added\nTYPE:ADD or RUN\n*******************\n");
+        }
+        
         inst_node=inst_node->NEXT;//进入下一新指令
         x++;//增进x
     }
@@ -72,13 +79,27 @@ D_RT delete_instruction_node(instruction *inst, instruction_node *inst_node){
     if(inst_node->NEXT!=NULL)inst_node->NEXT->PREV=inst_node->PREV;
     if(inst->HEAD==inst_node)inst->HEAD=inst_node->NEXT;
     if(inst->TAIL==inst_node)inst->TAIL=inst_node->PREV;
+    inst->INSTRUCTION_COUNT--;
+    //TODO: 重新计算跨度和起始位置
+    if(inst_node->POSITION==inst->START_POSITION || inst->START_POSITION+inst->LENGTH==inst_node->POSITION+inst_node->SIZE){
+        instruction_node *curr=inst->HEAD;
+        uint64_t start=curr->POSITION;
+        size_t size=curr->SIZE;
+        while(curr!=NULL){
+            start=delta_min(start, curr->POSITION);
+            size=delta_max(size, curr->POSITION+curr->SIZE-start);
+            curr=curr->NEXT;
+        }
+        inst->START_POSITION=start;
+        inst->LENGTH=size;
+    }
     free(inst_node);
     return D_OK;
 }
 instruction_node *new_inst_node(instruction_node *prev/*可选*/,inst_type type,
-                                uint32_t posi,//此指令在源文件中的起始位置
-                                uint32_t size,
-                                char *data,uint32_t addr){
+                                uint64_t posi,//此指令在目标文件中的起始位置
+                                uint64_t size,
+                                char *data,uint64_t addr){
     instruction_node *ins_nd=(instruction_node *)malloc(sizeof(instruction_node));
     ins_nd->PREV=prev;
     if(prev!=NULL)prev->NEXT=ins_nd;
@@ -103,7 +124,7 @@ D_RT instructions_mediator(instruction *inst, instruction_node *inst_node){
     while(temp!=NULL){
         temp2=temp;
         temp=temp->PREV;
-        uint32_t endpoint=temp2->POSITION+temp2->SIZE-1;
+        uint64_t endpoint=temp2->POSITION+temp2->SIZE-1;
         if(inst_node->POSITION<=endpoint){
             //判断insttype，run或add直接覆盖，copy必须完全包含了原指令才能覆盖
             switch (temp2->INST_TYPE) {
@@ -119,7 +140,7 @@ D_RT instructions_mediator(instruction *inst, instruction_node *inst_node){
                     if(inst_node->POSITION<=temp2->POSITION){//完全覆盖了原COPY指令，删除原COPY
                         delete_instruction_node(inst, temp2);
                     }else{//没有完全覆盖，修改新COPY指令的target起始地址和size和addr
-                        uint32_t cover=endpoint-inst_node->POSITION+1;
+                        uint64_t cover=endpoint-inst_node->POSITION+1;
                         inst_node->SIZE-=cover;
                         inst_node->POSITION+=cover;
                         inst_node->DATA_or_ADDR.addr+=cover;
@@ -131,6 +152,40 @@ D_RT instructions_mediator(instruction *inst, instruction_node *inst_node){
         }else{
             break;
         }
+    }
+    return D_OK;
+}
+
+
+
+
+
+
+D_RT ADD_complement(instruction *inst,target_window *win){
+    uint64_t next_start=0;
+    instruction_node *curr=inst->HEAD;
+    while(curr!=NULL){
+        if(next_start<curr->POSITION){
+            instruction_node *new_add=new_inst_node(NULL, ADD, next_start, curr->POSITION-next_start, &win->BUFFER[next_start], 0);
+            if(curr==inst->HEAD){
+                inst->HEAD=new_add;
+            }else{
+                curr->PREV->NEXT=new_add;
+                new_add->PREV=curr->PREV;
+            }
+            curr->PREV=new_add;
+            new_add->NEXT=curr;
+            inst->INSTRUCTION_COUNT++;
+        }
+        curr=curr->NEXT;
+    }
+    uint64_t final=inst->TAIL->POSITION+inst->TAIL->SIZE;
+    if(win->BUFFER_SIZE>final){
+        instruction_node *new_add=new_inst_node(NULL, ADD, final, win->BUFFER_SIZE-final, &win->BUFFER[final], 0);
+        inst->TAIL->NEXT=new_add;
+        new_add->PREV=inst->TAIL;
+        inst->TAIL=new_add;
+        inst->INSTRUCTION_COUNT++;
     }
     return D_OK;
 }

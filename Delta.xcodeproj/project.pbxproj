@@ -14,6 +14,7 @@
 		FA1B1AA72590A93600660CD7 /* INSTRUCTION.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1B1AA62590A93600660CD7 /* INSTRUCTION.c */; };
 		FA1F19992593244700E46227 /* crcspeed.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1F19962593244700E46227 /* crcspeed.c */; };
 		FA1F199A2593244700E46227 /* crc16speed.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1F19972593244700E46227 /* crc16speed.c */; };
+		FA24FBAC25997AD600267398 /* VCDIFF.c in Sources */ = {isa = PBXBuildFile; fileRef = FA24FBAB25997AD600267398 /* VCDIFF.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -45,6 +46,8 @@
 		FA1F19962593244700E46227 /* crcspeed.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = crcspeed.c; sourceTree = "<group>"; };
 		FA1F19972593244700E46227 /* crc16speed.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = crc16speed.c; sourceTree = "<group>"; };
 		FA1F19982593244700E46227 /* crcspeed.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = crcspeed.h; sourceTree = "<group>"; };
+		FA24FBAA25997AD600267398 /* VCDIFF.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VCDIFF.h; sourceTree = "<group>"; };
+		FA24FBAB25997AD600267398 /* VCDIFF.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = VCDIFF.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +100,8 @@
 				FA1B1AA22590A90400660CD7 /* SOURCE.c */,
 				FA1B1AA52590A93600660CD7 /* INSTRUCTION.h */,
 				FA1B1AA62590A93600660CD7 /* INSTRUCTION.c */,
+				FA24FBAA25997AD600267398 /* VCDIFF.h */,
+				FA24FBAB25997AD600267398 /* VCDIFF.c */,
 			);
 			path = CLASS;
 			sourceTree = "<group>";
@@ -179,6 +184,7 @@
 				FA1F199A2593244700E46227 /* crc16speed.c in Sources */,
 				FA1F19992593244700E46227 /* crcspeed.c in Sources */,
 				FA1B1A9F2590A88500660CD7 /* TARGET.c in Sources */,
+				FA24FBAC25997AD600267398 /* VCDIFF.c in Sources */,
 				FA1B1A8F258C4D9000660CD7 /* main.c in Sources */,
 				FA1B1AA32590A90400660CD7 /* SOURCE.c in Sources */,
 				FA1B1AA72590A93600660CD7 /* INSTRUCTION.c in Sources */,

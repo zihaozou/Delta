@@ -20,9 +20,10 @@
 #define MAX_BLOCK_NUMBER 8
 #define CRC_LEN 8
 #define DEFAULT_TARGET_WIN_SIZE 2048
+#define s_near 4
+#define s_same 3
 
-
-
+typedef unsigned char byte;
 typedef enum delta_return{
     D_OK,
     D_ERROR,
@@ -35,11 +36,12 @@ typedef enum delta_return{
 typedef enum _inst_type{
     COPY,
     ADD,
-    RUN
+    RUN,
+    NOOP
 }inst_type;
 typedef union _data_addr{
     char *data;
-    uint32_t addr;
+    uint64_t addr;
 }data_addr;
 typedef enum _lru_mode{
     SINGLE,
@@ -57,7 +59,7 @@ typedef struct _stream{
     uint64_t INPUT_POSITION;
     struct _target *TARGET;
     struct _source *SOURCE;
-    struct _target_window *CURRENT_WINDOW;
+    //struct _target_window *CURRENT_WINDOW;
 }stream;
 
 
@@ -106,7 +108,7 @@ typedef struct _source_window{
 }source_window;
 
 typedef struct _block{
-    uint32_t BLOCK_NUMBER;
+    int BLOCK_NUMBER;
     char *DATA;
     size_t DATA_SIZE;
     struct _block *PREV;
@@ -130,8 +132,8 @@ typedef struct _lru_manager{
 typedef struct _instruction{
     uint8_t FIRST_COPY;
     uint32_t INSTRUCTION_COUNT;
-    uint32_t START_POSITION;//在源文件中的起始位置
-    uint32_t LENGTH;//指令在源文件中的跨度
+    uint64_t START_POSITION;//在源文件中的起始位置
+    uint64_t LENGTH;//指令在源文件中的跨度
     struct _instruction_node *HEAD;
     struct _instruction_node *TAIL;
 }instruction;
@@ -139,8 +141,8 @@ typedef struct _instruction_node{
     struct _instruction_node *PREV;
     struct _instruction_node *NEXT;
     inst_type INST_TYPE;
-    uint32_t POSITION;//此指令在源文件中的起始位置
-    uint32_t SIZE;
+    uint64_t POSITION;//此指令在目标文件中的起始位置
+    uint64_t SIZE;
     data_addr DATA_or_ADDR;
 }instruction_node;
 
@@ -153,7 +155,7 @@ typedef struct _source_hash{
 }source_hash;
 typedef struct _source_position{
     struct _source_position *next;
-    uint32_t position;
+    uint64_t position;
 }source_position;
 
 #endif /* type_def_h */
