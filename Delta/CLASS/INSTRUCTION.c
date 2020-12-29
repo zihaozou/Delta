@@ -81,18 +81,18 @@ D_RT delete_instruction_node(instruction *inst, instruction_node *inst_node){
     if(inst->TAIL==inst_node)inst->TAIL=inst_node->PREV;
     inst->INSTRUCTION_COUNT--;
     //TODO: 重新计算跨度和起始位置
-    if(inst_node->POSITION==inst->START_POSITION || inst->START_POSITION+inst->LENGTH==inst_node->POSITION+inst_node->SIZE){
-        instruction_node *curr=inst->HEAD;
-        uint64_t start=curr->POSITION;
-        size_t size=curr->SIZE;
-        while(curr!=NULL){
-            start=delta_min(start, curr->POSITION);
-            size=delta_max(size, curr->POSITION+curr->SIZE-start);
-            curr=curr->NEXT;
-        }
-        inst->START_POSITION=start;
-        inst->LENGTH=size;
-    }
+//    if(inst_node->POSITION==inst->START_POSITION || inst->START_POSITION+inst->LENGTH==inst_node->POSITION+inst_node->SIZE){
+//        instruction_node *curr=inst->HEAD;
+//        uint64_t start=curr->POSITION;
+//        size_t size=curr->SIZE;
+//        while(curr!=NULL){
+//            start=delta_min(start, curr->POSITION);
+//            size=delta_max(size, curr->POSITION+curr->SIZE-start);
+//            curr=curr->NEXT;
+//        }
+//        inst->START_POSITION=start;
+//        inst->LENGTH=size;
+//    }
     free(inst_node);
     return D_OK;
 }

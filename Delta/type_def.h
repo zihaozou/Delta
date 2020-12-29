@@ -22,7 +22,14 @@
 #define DEFAULT_TARGET_WIN_SIZE 2048
 #define s_near 4
 #define s_same 3
-
+#if s_near<=0
+#define s_near 4
+#endif
+#if s_same<=0
+#define s_same 3
+#endif
+#define VCD_SELF 0
+#define VCD_HERE 1
 typedef unsigned char byte;
 typedef enum delta_return{
     D_OK,
@@ -157,5 +164,39 @@ typedef struct _source_position{
     struct _source_position *next;
     uint64_t position;
 }source_position;
+
+
+
+typedef struct _code{
+    byte WIN_INDICATOR;
+    size_t SOURCE_SEGMENT_LENGTH;
+    uint64_t SOURCE_SEGMENT_POSITION;
+    size_t LEN_CODE;
+    size_t TARGET_LEN;
+    byte DELTA_INDICATOR;
+    size_t LEN_DATA;
+    size_t LEN_INST;
+    size_t LEN_ADDR;
+    
+    
+    struct _code_node *HEAD;
+    struct _code_node *TAIL;
+} code;
+typedef struct _code_node{
+    byte CODE;
+    uint32_t SIZE1;
+    uint32_t SIZE2;
+    data_addr DATAADDR;
+    uint32_t INST_SIZE;
+    //uint32_t DATA_ADDR_SIZE;
+    
+    
+    struct _code_node *NEXT;
+} code_node;
+typedef struct _addr_cache{
+    uint64_t near[s_near];
+    int next_slot;
+    uint64_t same[s_same*256];
+} addr_cache;
 
 #endif /* type_def_h */

@@ -7,6 +7,14 @@
 
 #include "VCDIFF.h"
 
+static D_RT cache_init(addr_cache *cc);
+static D_RT cache_update(addr_cache *cc,uint64_t addr);
+static uint64_t addr_encode(addr_cache* cc, uint64_t addr, uint64_t here, uint8_t* mode);
+static uint32_t count_int_len(uint32_t integer);
+static uint32_t count_int64_len(uint64_t integer);
+
+
+
 
 D_RT window_packer(FILE *delta,stream *stm){
     return D_OK;
@@ -14,60 +22,179 @@ D_RT window_packer(FILE *delta,stream *stm){
 }
 
 
-typedef struct _code{
-    byte WIN_INDICATOR;
-    size_t SOURCE_SEGMENT_LENGTH;
-    uint64_t SOURCE_SEGMENT_POSITION;
-    size_t LEN_CODE;
-    size_t TARGET_LEN;
-    byte DELTA_INDICATOR;
-    size_t LEN_DATA;
-    size_t LEN_INST;
-    size_t LEN_ADDR;
-    byte *DATA;
-    byte *INST;
-    byte *ADDR;
-    
-    
-    struct _code_node *HEAD;
-    struct _code_node *TAIL;
-} code;
-typedef struct _code_node{
-    byte CODE;
-    uint32_t SIZE1;
-    uint32_t SIZE2;
-    data_addr DATAADDR;
-    uint32_t CODE_SIZE;
-    struct _code_node *NEXT;
-} code_node;
 
-#if s_near<=0
-#define s_near 4
-#endif
-#if s_same<=0
-#define s_same 3
-#endif
-typedef struct _addr_cache{
-    uint64_t near[s_near];
-    int next_slot;
-    uint64_t same[s_same*256];
-} addr_cache;
-D_RT cache_init(addr_cache *cc){
+
+
+
+
+
+D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr){
+    code_node *new=(code_node *)malloc(sizeof(code_node));
+    new->CODE=instcode;
+    new->SIZE1=size1;
+    new->SIZE2=0;
+    new->DATAADDR=dataaddr;
+    new->NEXT=NULL;
+    //new->DATA_ADDR_SIZE=0;
+    if(DeltaDefaultCodeTable[2][instcode]==0){
+        cod->LEN_INST+=count_int_len(size1);
+        //如果指令code中的code选项为0，则需要额外的size字节
+    }
+    cod->LEN_INST++;
+    if(DeltaDefaultCodeTable[0][instcode]==COPY){
+        if(6<=DeltaDefaultCodeTable[4][instcode] && DeltaDefaultCodeTable[4][instcode]<=8){
+            //如果mode为VCD_SAME，其addr大小永远为1gebyte
+            cod->LEN_ADDR+=1;
+        }else{
+            //如果为其他mode，其大小随着addr大小变化，我们需要手动计算；
+            cod->LEN_ADDR+=count_int64_len(dataaddr.addr);
+        }
+    }else if(DeltaDefaultCodeTable[0][instcode]==ADD){
+        //如果指令为add，则需要加上数据大小
+        cod->LEN_DATA+=size1;
+    }else{
+        //如果指令为run，则需要加上1个byte
+        cod->LEN_DATA+=1;
+    }
+    
+    if(cod->TAIL==NULL && cod->HEAD==NULL){
+        cod->HEAD=new;
+        cod->TAIL=new;
+    }else{
+        cod->TAIL->NEXT=new;
+    }
+    return D_OK;
+}
+D_RT code_instruction(instruction *inst,code *cod){
+    data_addr local;
+    uint64_t local_mask=inst->START_POSITION;
+    uint8_t mode;
+    //uint32_t size;
+    byte instcode;
+    instruction_node *curr_nd=inst->HEAD;
+    addr_cache cache;
+    cache_init(&cache);
+    while(curr_nd!=NULL){//MARK: 未来此处可能需要判断small match
+        if(curr_nd->INST_TYPE==COPY){
+            local.addr=curr_nd->DATA_or_ADDR.addr-local_mask;
+            local.addr=addr_encode(&cache, local.addr, curr_nd->POSITION+inst->LENGTH, &mode);
+            instcode=19+mode*16+((curr_nd->SIZE<=18 && curr_nd->SIZE>=4)?curr_nd->SIZE-3:0);
+            add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+        }else if(curr_nd->INST_TYPE==RUN){
+            local.data=curr_nd->DATA_or_ADDR.data;
+            instcode=0;
+            add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+        }else if(curr_nd->INST_TYPE==ADD){
+            local.data=curr_nd->DATA_or_ADDR.data;
+            instcode=(curr_nd->SIZE>=1 && curr_nd->SIZE<=17)?curr_nd->SIZE+1:1;
+            add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+        }
+        curr_nd=curr_nd->NEXT;
+    }
+    
+    return D_OK;
+}
+
+
+code *create_code(stream *stm){
+    code *new=(code *)malloc(sizeof(code));
+    memset(new, 0, sizeof(code));
+    new->WIN_INDICATOR=0x01;
+    new->TARGET_LEN=stm->TARGET->TARGET_WINDOW->BUFFER_SIZE;
+    new->SOURCE_SEGMENT_POSITION=stm->TARGET->TARGET_WINDOW->INSTRUCTION->START_POSITION;
+    new->SOURCE_SEGMENT_LENGTH=stm->TARGET->TARGET_WINDOW->INSTRUCTION->LENGTH;
+    return new;
+}
+
+
+
+
+
+D_RT _write_integer(FILE * file,uint64_t integer,byte cnt){
+    if(integer){
+        byte temp=0x7f &integer;
+        if(cnt)temp=temp | 0x80;
+        integer=integer>>7;
+        _write_integer(file, integer,++cnt);
+        fwrite(&temp, sizeof(byte), 1, file);
+    }
+    return D_OK;
+}
+
+D_RT write_byte(FILE * file,byte Byte){
+    fwrite(&Byte, sizeof(byte), 1, file);
+    return D_OK;
+}
+
+D_RT write_bytes(FILE * file,char *buffer,int size){
+    fwrite(buffer, size, 1, file);
+    return D_OK;
+}
+
+
+
+void content_writer(FILE *file,code *cod){//先只考虑单指令
+    code_node *curr=cod->HEAD;
+    while(curr){
+        if(DeltaDefaultCodeTable[0][curr->CODE]==ADD)
+        write_bytes(file,curr->DATAADDR.data,curr->SIZE1);
+        else if(DeltaDefaultCodeTable[0][curr->CODE]==RUN)
+            write_byte(file, curr->DATAADDR.data[0]);
+        curr=curr->NEXT;
+    }
+    curr=cod->HEAD;
+    while(curr){
+        write_byte(file,curr->CODE);
+        if(DeltaDefaultCodeTable[2][curr->CODE])write_integer(file,curr->SIZE1);
+        //if(curr->SIZE2)write_byte(file,curr->SIZE2);
+        curr=curr->NEXT;
+    }
+    curr=cod->HEAD;
+    while(curr){
+        if(DeltaDefaultCodeTable[0][curr->CODE]==COPY){
+            if(DeltaDefaultCodeTable[4][curr->CODE]<6){
+                write_integer(file, curr->SIZE1);
+            }else{
+                write_byte(file, (byte)curr->SIZE1);
+            }
+        }
+        curr=curr->NEXT;
+    }
+    
+}
+
+void win_header_writer(FILE *file,code *cod){
+    write_byte(file, cod->WIN_INDICATOR);
+    write_integer(file, cod->SOURCE_SEGMENT_LENGTH);
+    write_integer(file, cod->SOURCE_SEGMENT_POSITION);
+    cod->LEN_CODE=count_int64_len(cod->TARGET_LEN)+count_int64_len(cod->DELTA_INDICATOR)+count_int64_len(cod->LEN_INST)+count_int64_len(cod->LEN_DATA)+count_int64_len(cod->LEN_ADDR)+cod->LEN_INST+cod->LEN_ADDR+cod->LEN_DATA;
+    write_integer(file, cod->LEN_CODE);
+    write_integer(file, cod->TARGET_LEN);
+    write_byte(file, cod->DELTA_INDICATOR);
+    write_integer(file, cod->LEN_DATA);
+    write_integer(file, cod->LEN_INST);
+    write_integer(file, cod->LEN_ADDR);
+}
+
+
+
+
+/*内部函数*/
+static D_RT cache_init(addr_cache *cc){
     int i;
     cc->next_slot=0;
     for(i=0;i<s_near;i++)cc->near[i]=0;
     for (i=0; i<s_same*256; i++)cc->same[i]=0;
     return D_OK;
 }
-D_RT cache_update(addr_cache *cc,uint64_t addr){
+static D_RT cache_update(addr_cache *cc,uint64_t addr){
     cc->near[cc->next_slot]=addr;
     cc->next_slot=(cc->next_slot+1)%s_near;
     cc->same[addr%(s_same*256)]=addr;
     return D_OK;
 }
-#define VCD_SELF 0
-#define VCD_HERE 1
-uint64_t addr_encode(addr_cache* cc, uint64_t addr, uint64_t here, uint8_t* mode){
+
+static uint64_t addr_encode(addr_cache* cc, uint64_t addr, uint64_t here, uint8_t* mode){
     int i;
     uint64_t d,bestd;
     uint8_t bestm;
@@ -88,7 +215,7 @@ uint64_t addr_encode(addr_cache* cc, uint64_t addr, uint64_t here, uint8_t* mode
     *mode=bestm;
     return bestd;
 }
-uint32_t count_int_len(uint32_t integer){
+static uint32_t count_int_len(uint32_t integer){
     uint32_t len=0;
     while(integer){
         integer=integer>>7;
@@ -96,7 +223,7 @@ uint32_t count_int_len(uint32_t integer){
     }
     return len;
 }
-uint64_t count_int64_len(uint64_t integer){
+static uint32_t count_int64_len(uint64_t integer){
     uint32_t len=0;
     while(integer){
         integer=integer>>7;
@@ -104,68 +231,57 @@ uint64_t count_int64_len(uint64_t integer){
     }
     return len;
 }
+
+
+
+
+
+
+
+/*测试用函数*/
+D_RT test_output_delta(code *cod){
+    FILE *delta=fopen("output", "wb+");
+    /*WIN_HEADER*/
+    fwrite(&cod->WIN_INDICATOR, sizeof(byte), 1, delta);
+    write_integer(delta, cod->SOURCE_SEGMENT_LENGTH);
+    write_integer(delta, cod->SOURCE_SEGMENT_POSITION);
+    cod->LEN_CODE=count_int64_len(cod->TARGET_LEN)+count_int64_len(cod->DELTA_INDICATOR)+count_int64_len(cod->LEN_INST)+count_int64_len(cod->LEN_DATA)+count_int64_len(cod->LEN_ADDR)+cod->LEN_INST+cod->LEN_ADDR+cod->LEN_DATA;
+    write_integer(delta, cod->LEN_CODE);
+    write_integer(delta, cod->TARGET_LEN);
+    fwrite(&cod->DELTA_INDICATOR, sizeof(byte), 1, delta);
+    write_integer(delta, cod->LEN_DATA);
+    write_integer(delta, cod->LEN_INST);
+    write_integer(delta, cod->LEN_ADDR);
+    
+    
+    /*WIN_CONTENT*/
+    content_writer(delta,cod);
+    fclose(delta);
+    return D_OK;
+}
+
+void vcd_test(void){
+    code *Code=(code *)malloc(sizeof(code));
+    memset(Code, 0, sizeof(code));
+    Code->WIN_INDICATOR=0x01;
+    Code->SOURCE_SEGMENT_LENGTH=1024;
+    Code->SOURCE_SEGMENT_POSITION=0;
+    Code->TARGET_LEN=1024;
+    instruction *Inst=create_instruction();
+    instruction_node *new_nd= new_inst_node(NULL, COPY, 0, 10, NULL, 100);
+    add_instructions(Inst, new_nd, 1);
+    char buffer[]="HERE IS SOME DATA";
+    instruction_node *new_nd2= new_inst_node(NULL, ADD, 10, sizeof(buffer), buffer,0);
+    add_instructions(Inst, new_nd2, 1);
+    code_instruction(Inst,Code);
+    test_output_delta(Code);
+}
+
+
+
 void count_int_len_test(void){
     uint32_t test[3]={127,16383,2097151};
     for(int x=0;x<3;x++){
         printf("number %d length is %d\n",test[x],count_int_len(test[x]));
     }
 }
-D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr){
-    code_node *new=(code_node *)malloc(sizeof(code_node));
-    new->CODE=instcode;
-    new->SIZE1=size1;
-    new->SIZE2=0;
-    new->DATAADDR=dataaddr;
-    new->NEXT=NULL;
-    new->CODE_SIZE=1;//指令code的大小
-    if(DeltaDefaultCodeTable[2][instcode]==0){
-        new->CODE_SIZE+=count_int_len(size1);//如果指令code中的code选项为0，则需要额外的size字节
-    }
-    if(6<=DeltaDefaultCodeTable[4][instcode] && DeltaDefaultCodeTable[4][instcode]<=8){
-        new->CODE_SIZE++;//如果mode为VCD_SAME，其addr大小永远为1gebyte
-    }else{
-        if(DeltaDefaultCodeTable[0][instcode]==COPY){
-            new->CODE_SIZE+=count_int64_len(dataaddr.addr);//如果为其他mode，其大小随着addr大小变化，我们需要手动计算；
-        }else if(DeltaDefaultCodeTable[0][instcode]==ADD){
-            new->CODE_SIZE+=size1;//如果指令为add，则需要加上数据大小
-        }else{
-            new->CODE_SIZE++;//如果指令为run，则需要加上1个byte
-        }
-    }
-    
-    if(cod->TAIL==NULL && cod->HEAD==NULL){
-        cod->HEAD=new;
-        cod->TAIL=new;
-    }else{
-        cod->TAIL->NEXT=new;
-    }
-    return D_OK;
-}
-D_RT code_instruction(instruction *inst,code *cod){
-    data_addr local;
-    uint64_t local_mask=inst->START_POSITION;
-    uint8_t mode;
-    byte instcode;
-    instruction_node *curr_nd=inst->HEAD;
-    addr_cache cache;
-    cache_init(&cache);
-    while(curr_nd!=NULL){
-        if(curr_nd->INST_TYPE==COPY){//MARK: 未来此处可能需要判断small match
-            local.addr=curr_nd->DATA_or_ADDR.addr-local_mask;
-            local.addr=addr_encode(&cache, local.addr, curr_nd->POSITION+inst->LENGTH, &mode);
-            instcode=19+mode*16+((curr_nd->SIZE<=18 && curr_nd->SIZE>=4)?curr_nd->SIZE-3:0);
-            add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
-        }else if(curr_nd->INST_TYPE==RUN){
-            local.data=curr_nd->DATA_or_ADDR.data;
-            instcode=0;
-            add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
-        }else if(curr_nd->INST_TYPE==ADD){
-            local.data=curr_nd->DATA_or_ADDR.data;
-            instcode=(curr_nd->SIZE>=1 && curr_nd->SIZE<=17)?curr_nd->SIZE:0;
-            add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
-        }
-    }
-    return D_OK;
-}
-
-
