@@ -47,4 +47,5 @@ D_RT global_source_hash(source *src);
 char get_char_at(source *src,uint32_t position);
 D_RT get_block(source *src,uint32_t blk_no);
 D_RT get_n_char_at(source *src,uint32_t position, char buffer[]);
+D_RT clean_source(source *src);
 #endif /* SOURCE_h */

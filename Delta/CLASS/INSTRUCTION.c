@@ -176,9 +176,12 @@ D_RT ADD_complement(instruction *inst,target_window *win){
             curr->PREV=new_add;
             new_add->NEXT=curr;
             inst->INSTRUCTION_COUNT++;
+            
         }
+        next_start=curr->POSITION+curr->SIZE;
         curr=curr->NEXT;
     }
+    //TODO: 添加ADD最后一个时有BUG
     uint64_t final=inst->TAIL->POSITION+inst->TAIL->SIZE;
     if(win->BUFFER_SIZE>final){
         instruction_node *new_add=new_inst_node(NULL, ADD, final, win->BUFFER_SIZE-final, &win->BUFFER[final], 0);

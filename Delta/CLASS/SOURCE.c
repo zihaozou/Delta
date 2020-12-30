@@ -335,7 +335,7 @@ char get_char_at(source *src,uint32_t position){
     //lru_manager *lru=src->SOURCE_WINDOW->LRU_MANAGER;
     uint64_t init_blk_size=src->SOURCE_WINDOW->WINDOW_SIZE/
     src->SOURCE_WINDOW->LRU_MANAGER->BLOCK_IN_POOL;
-    if(position+CRC_LEN-1>=src->SOURCE_FILE->FILE_SIZE){
+    if(position>=src->SOURCE_FILE->FILE_SIZE){
         printf("\nERROR: exceeds file size\n");
         exit(0);
     }
@@ -345,3 +345,30 @@ char get_char_at(source *src,uint32_t position){
     return src->SOURCE_WINDOW->CURRENT_BLOCK->DATA[local_position];
     
 }
+
+D_RT clean_source(source *src){
+    source_hash *current, *tmp;
+
+    fclose(src->SOURCE_FILE->FILE_INSTANCE);
+    free(src->SOURCE_FILE);
+    
+    HASH_ITER(hh, src->SOURCE_HASH, current, tmp) {
+        HASH_DEL(src->SOURCE_HASH,current);
+        source_position *posi=current->head;
+        source_position *posi_next;
+        while(posi!=NULL){
+            posi_next=posi->next;
+            free(posi);
+            posi=posi_next;
+        }
+        free(current);
+    }
+    HASH_CLEAR(hh,src->SOURCE_WINDOW->LRU_MANAGER->IN_POOL_BLOCK_HASH);
+    free(src->SOURCE_WINDOW->LRU_MANAGER);
+    free(src->SOURCE_WINDOW);
+    free(src);
+    return D_OK;
+}
+
+
+

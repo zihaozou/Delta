@@ -18,6 +18,14 @@ target *create_target(void){
     tgt->TARGET_WINDOW->WIN_NUMBER=-1;
     return tgt;
 }
+D_RT clean_target(target *tgt){
+    free(tgt->TARGET_WINDOW->BUFFER);
+    free(tgt->TARGET_WINDOW);
+    fclose(tgt->TARGET_FILE->FILE_INSTANCE);
+    free(tgt->TARGET_FILE);
+    free(tgt);
+    return D_OK;
+}
 D_RT set_tgt_file(target *tgt,const char *filename){
     if(tgt==NULL){
         printf("\nERROR: target uninitilized\n");

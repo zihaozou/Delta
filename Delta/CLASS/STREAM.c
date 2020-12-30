@@ -52,7 +52,7 @@ D_RT init_encode(stream *stm){
 //match，这三种情况会在匹配时全部进行一遍，然后由instuction里面的instruction_mediator调和三种情况的结果，选出最优
 //解。在我们的情况中，我们无需考虑lazymatch的问题，因为在匹配阶段我们就已经找到了全局的最优解，可以直接跳过已匹配的部分，
 
-
+#define MIN_RUN_LEN 4
 //TODO: 还需搞清large match和small match之间的最优解原理
 D_RT match(stream *stm){
     printf("\nSTRING MATCH: initial entry: %llu\n",stm->INPUT_POSITION);
@@ -62,11 +62,27 @@ D_RT match(stream *stm){
     source_hash *s;
     source_hash *hashtable=stm->SOURCE->SOURCE_HASH;
     instruction *inst=stm->TARGET->TARGET_WINDOW->INSTRUCTION;
-    while(stm->INPUT_REMAINING>=CRC_LEN/*MARK: 这里未来可能会修改，需要判定匹配所需的最小值，这个最小值由RUN，small match和large match三者所影响，现在只考虑largematch的情况*/){
+    while(stm->INPUT_REMAINING>=MIN_RUN_LEN/*MARK: 这里未来可能会修改，需要判定匹配所需的最小值，这个最小值由RUN，small match和large match三者所影响，现在只考虑largematch的情况*/){
         
         
         /*MARK: RUN*/
         //TODO: 修改instructions mediator内的run逻辑
+        if(stm->INPUT_REMAINING>=MIN_RUN_LEN){
+            uint64_t curr=stm->INPUT_POSITION;
+            uint64_t size=0;
+            while(curr+1<=stm->TARGET->TARGET_WINDOW->BUFFER_SIZE-1){
+                if(tgt_buffer[curr]==tgt_buffer[curr+1]){
+                    size++;
+                    curr++;
+                }
+                else break;
+            }
+            size++;
+            if(size>=4){
+                instruction_node *new=new_inst_node(NULL, RUN, stm->INPUT_POSITION, size, &tgt_buffer[stm->INPUT_POSITION], 0);
+                add_instructions(inst, new, 1);
+            }
+        }
         
         /*MARK: LARGE_MATCH,这里重复检查一遍stm->INPUT_REMAINING>=CRC_LEN，为了以后上面的while判断条件可能会被修改*/
         if(stm->INPUT_REMAINING>=CRC_LEN){
@@ -116,12 +132,10 @@ instruction_node *match_extend(uint64_t curr_posi,target_window *win,source *src
         //try_tgt_end=curr_posi;
         try_tgt_start=curr_posi;
         try_size=0;
-        try_size_max=delta_min(src->SOURCE_FILE->FILE_SIZE-try_src_start, win->BUFFER_SIZE-try_tgt_start);
+        try_size_max=delta_min(src->SOURCE_FILE->FILE_SIZE-try_src_start-1, win->BUFFER_SIZE-try_tgt_start-1);
         
         //FORWARD EXTEND
-        while(get_char_at(src, (uint32_t)(try_src_start+try_size))==
-              win->BUFFER[try_tgt_start+try_size]
-              && try_size<try_size_max){
+        while(try_size<=try_size_max&&get_char_at(src, (uint32_t)(try_src_start+try_size))==win->BUFFER[try_tgt_start+try_size]){
             try_size++;
         }
         
@@ -155,18 +169,25 @@ instruction_node *match_extend(uint64_t curr_posi,target_window *win,source *src
 
 
 void stream_match_test(void){
+    FILE *output=fopen("delta_file", "wb+");
     stream *Stream=create_stream();
     target *Target=create_target();
     source *Source=create_source();
     //instruction *Instruction=create_instruction();
-    set_src_file(Source, "old");
+    set_src_file(Source, "source_64B");
     init_window(Source);
     global_source_hash(Source);
-    set_tgt_file(Target, "new");
+    set_tgt_file(Target, "target_64B");
     set_window(Target);
     add_target(Stream, Target);
     add_source(Stream, Source);
     init_encode(Stream);
     match(Stream);
+    ADD_complement(Stream->TARGET->TARGET_WINDOW->INSTRUCTION, Stream->TARGET->TARGET_WINDOW);
+    header_packer(output, Stream);
+    window_packer(output, Stream);
+    delete_inst_list(Target->TARGET_WINDOW->INSTRUCTION);
+    clean_source(Source);
+    clean_target(Target);
     //TODO: ADD_complement和vcd_packer。完成后添加RUN和small match
 }

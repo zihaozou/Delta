@@ -154,23 +154,8 @@ static const int DeltaDefaultCodeTable[6][256] =
 
 
 D_RT window_packer(FILE *delta,stream *stm);
-
-
-
-
-
-D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr);
-D_RT code_instruction(instruction *inst,code *cod);
-code *create_code(stream *stm);
-D_RT _write_integer(FILE * file,uint64_t integer,byte cnt);
-D_RT write_byte(FILE * file,byte Byte);
-D_RT write_bytes(FILE * file,char *buffer,int size);
-void content_writer(FILE *file,code *cod);
-void win_header_writer(FILE *file,code *cod);
-
-
-
-
+D_RT header_packer(FILE *delta,stream *stm);
+D_RT clean_code(code *cod);
 void count_int_len_test(void);
 void vcd_test(void);
 #endif /* VCDIFF_h */

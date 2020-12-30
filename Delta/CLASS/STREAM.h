@@ -13,6 +13,7 @@
 #include "SOURCE.h"
 #include "INSTRUCTION.h"
 #include "TARGET.h"
+#include "VCDIFF.h"
 stream *create_stream(void);
 D_RT add_target(stream *stm, target *tgt);
 D_RT add_source(stream *stm, source *src);

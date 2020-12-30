@@ -11,9 +11,9 @@
 #include "VCDIFF.h"
 //static source *Source;
 int main(int argc, const char * argv[]) {
-    //stream_match_test();
+    stream_match_test();
     //count_int_len_test();
-    vcd_test();
+    //vcd_test();
     // insert code here...
     printf("Hello, World!\n");
     return 0;

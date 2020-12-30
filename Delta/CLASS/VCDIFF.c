@@ -10,25 +10,61 @@
 static D_RT cache_init(addr_cache *cc);
 static D_RT cache_update(addr_cache *cc,uint64_t addr);
 static uint64_t addr_encode(addr_cache* cc, uint64_t addr, uint64_t here, uint8_t* mode);
-static uint32_t count_int_len(uint32_t integer);
+//static uint32_t count_int_len(uint32_t integer);
 static uint32_t count_int64_len(uint64_t integer);
+static D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr);
+static D_RT code_instruction(instruction *inst,code *cod);
+static code *create_code(stream *stm);
+static D_RT _write_integer(FILE * file,uint64_t integer,byte cnt);
+static D_RT write_byte(FILE * file,byte Byte);
+static D_RT write_bytes(FILE * file,char *buffer,int size);
+static void content_writer(FILE *file,code *cod);
+static void win_header_writer(FILE *file,code *cod);
 
 
 
+D_RT header_packer(FILE *delta,stream *stm){
+    byte temp=0x00;
+    rewind(delta);
+    write_byte(delta, 'V');//V
+    write_byte(delta, 'C');//C
+    write_byte(delta, 'D');//D
+    write_byte(delta, SOFTWARE_VERSION);
+    //if(stm->DECOMPRESS)temp=temp | 0x01;
+    //if(stm->CODETABLE)temp=temp | 0x02;
+    write_byte(delta, temp);//HDR_INDICATOR
+    //MARK: 后期在此添加二次压缩和自定义指令表内容
+    return D_OK;
+}
 
 D_RT window_packer(FILE *delta,stream *stm){
+    code *cod=create_code(stm);
+    code_instruction(stm->TARGET->TARGET_WINDOW->INSTRUCTION, cod);
+    win_header_writer(delta,cod);
+    content_writer(delta,cod);
+    clean_code(cod);
     return D_OK;
-    
+}
+
+
+D_RT clean_code(code *cod){
+    code_node *curr=cod->HEAD;
+    code_node *next;
+    while(curr!=NULL){
+        next=curr->NEXT;
+        free(curr);
+        curr=next;
+    }
+    free(cod);
+    return D_OK;
 }
 
 
 
 
+/*内部函数*/
 
-
-
-
-D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr){
+static D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr){
     code_node *new=(code_node *)malloc(sizeof(code_node));
     new->CODE=instcode;
     new->SIZE1=size1;
@@ -37,7 +73,7 @@ D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr){
     new->NEXT=NULL;
     //new->DATA_ADDR_SIZE=0;
     if(DeltaDefaultCodeTable[2][instcode]==0){
-        cod->LEN_INST+=count_int_len(size1);
+        cod->LEN_INST+=count_int64_len(size1);
         //如果指令code中的code选项为0，则需要额外的size字节
     }
     cod->LEN_INST++;
@@ -60,12 +96,26 @@ D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr){
     if(cod->TAIL==NULL && cod->HEAD==NULL){
         cod->HEAD=new;
         cod->TAIL=new;
+        new->PREV=NULL;
     }else{
         cod->TAIL->NEXT=new;
+        new->PREV=cod->TAIL;
+        cod->TAIL=new;
     }
     return D_OK;
 }
-D_RT code_instruction(instruction *inst,code *cod){
+#define ENUM_NAME(x) case x: return(#x)
+const char *print_type(inst_type insttype){
+    switch (insttype) {
+            ENUM_NAME(COPY);
+            ENUM_NAME(ADD);
+            ENUM_NAME(RUN);
+            ENUM_NAME(NOOP);
+    }
+    return NULL;
+}
+#define PRINT_DELTA(type,code) printf("\n*******************\nDELTA CODE:\nTYPE: %s\nCODE: %d\n*******************\n",print_type(type),code)
+static D_RT code_instruction(instruction *inst,code *cod){
     data_addr local;
     uint64_t local_mask=inst->START_POSITION;
     uint8_t mode;
@@ -80,15 +130,19 @@ D_RT code_instruction(instruction *inst,code *cod){
             local.addr=addr_encode(&cache, local.addr, curr_nd->POSITION+inst->LENGTH, &mode);
             instcode=19+mode*16+((curr_nd->SIZE<=18 && curr_nd->SIZE>=4)?curr_nd->SIZE-3:0);
             add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+            PRINT_DELTA(COPY,instcode);
         }else if(curr_nd->INST_TYPE==RUN){
             local.data=curr_nd->DATA_or_ADDR.data;
             instcode=0;
             add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+            PRINT_DELTA(RUN,instcode);
         }else if(curr_nd->INST_TYPE==ADD){
             local.data=curr_nd->DATA_or_ADDR.data;
             instcode=(curr_nd->SIZE>=1 && curr_nd->SIZE<=17)?curr_nd->SIZE+1:1;
             add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+            PRINT_DELTA(ADD,instcode);
         }
+        
         curr_nd=curr_nd->NEXT;
     }
     
@@ -96,7 +150,7 @@ D_RT code_instruction(instruction *inst,code *cod){
 }
 
 
-code *create_code(stream *stm){
+static code *create_code(stream *stm){
     code *new=(code *)malloc(sizeof(code));
     memset(new, 0, sizeof(code));
     new->WIN_INDICATOR=0x01;
@@ -110,8 +164,8 @@ code *create_code(stream *stm){
 
 
 
-D_RT _write_integer(FILE * file,uint64_t integer,byte cnt){
-    if(integer){
+static D_RT _write_integer(FILE * file,uint64_t integer,byte cnt){
+    if(integer || cnt==0){
         byte temp=0x7f &integer;
         if(cnt)temp=temp | 0x80;
         integer=integer>>7;
@@ -121,19 +175,19 @@ D_RT _write_integer(FILE * file,uint64_t integer,byte cnt){
     return D_OK;
 }
 
-D_RT write_byte(FILE * file,byte Byte){
+static D_RT write_byte(FILE * file,byte Byte){
     fwrite(&Byte, sizeof(byte), 1, file);
     return D_OK;
 }
 
-D_RT write_bytes(FILE * file,char *buffer,int size){
+static D_RT write_bytes(FILE * file,char *buffer,int size){
     fwrite(buffer, size, 1, file);
     return D_OK;
 }
 
 
 
-void content_writer(FILE *file,code *cod){//先只考虑单指令
+static void content_writer(FILE *file,code *cod){//先只考虑单指令
     code_node *curr=cod->HEAD;
     while(curr){
         if(DeltaDefaultCodeTable[0][curr->CODE]==ADD)
@@ -145,7 +199,7 @@ void content_writer(FILE *file,code *cod){//先只考虑单指令
     curr=cod->HEAD;
     while(curr){
         write_byte(file,curr->CODE);
-        if(DeltaDefaultCodeTable[2][curr->CODE])write_integer(file,curr->SIZE1);
+        if(!DeltaDefaultCodeTable[2][curr->CODE])write_integer(file,curr->SIZE1);
         //if(curr->SIZE2)write_byte(file,curr->SIZE2);
         curr=curr->NEXT;
     }
@@ -153,9 +207,9 @@ void content_writer(FILE *file,code *cod){//先只考虑单指令
     while(curr){
         if(DeltaDefaultCodeTable[0][curr->CODE]==COPY){
             if(DeltaDefaultCodeTable[4][curr->CODE]<6){
-                write_integer(file, curr->SIZE1);
+                write_integer(file, curr->DATAADDR.addr);
             }else{
-                write_byte(file, (byte)curr->SIZE1);
+                write_byte(file, (byte)curr->DATAADDR.addr);
             }
         }
         curr=curr->NEXT;
@@ -163,7 +217,7 @@ void content_writer(FILE *file,code *cod){//先只考虑单指令
     
 }
 
-void win_header_writer(FILE *file,code *cod){
+static void win_header_writer(FILE *file,code *cod){
     write_byte(file, cod->WIN_INDICATOR);
     write_integer(file, cod->SOURCE_SEGMENT_LENGTH);
     write_integer(file, cod->SOURCE_SEGMENT_POSITION);
@@ -179,7 +233,6 @@ void win_header_writer(FILE *file,code *cod){
 
 
 
-/*内部函数*/
 static D_RT cache_init(addr_cache *cc){
     int i;
     cc->next_slot=0;
@@ -215,17 +268,9 @@ static uint64_t addr_encode(addr_cache* cc, uint64_t addr, uint64_t here, uint8_
     *mode=bestm;
     return bestd;
 }
-static uint32_t count_int_len(uint32_t integer){
-    uint32_t len=0;
-    while(integer){
-        integer=integer>>7;
-        len++;
-    }
-    return len;
-}
 static uint32_t count_int64_len(uint64_t integer){
     uint32_t len=0;
-    while(integer){
+    while(integer || !len){
         integer=integer>>7;
         len++;
     }
@@ -282,6 +327,6 @@ void vcd_test(void){
 void count_int_len_test(void){
     uint32_t test[3]={127,16383,2097151};
     for(int x=0;x<3;x++){
-        printf("number %d length is %d\n",test[x],count_int_len(test[x]));
+        printf("number %d length is %d\n",test[x],count_int64_len(test[x]));
     }
 }

@@ -12,9 +12,18 @@
 #include <stdio.h>
 #include "uthash.h"
 #include "crc16speed.h"
+
+
+#define SOFTWARE_VERSION 0x01
+
+
+
 //#include "utlist.h"
 #define delta_min(a,b)      ((a)<(b))?(a):(b)
 #define delta_max(a,b)      ((a)>(b))?(a):(b)
+
+
+
 
 #define SOURCE_WINDOW_SIZE 4096
 #define MAX_BLOCK_NUMBER 8
@@ -30,6 +39,9 @@
 #endif
 #define VCD_SELF 0
 #define VCD_HERE 1
+
+
+
 typedef unsigned char byte;
 typedef enum delta_return{
     D_OK,
@@ -192,7 +204,9 @@ typedef struct _code_node{
     
     
     struct _code_node *NEXT;
+    struct _code_node *PREV;
 } code_node;
+
 typedef struct _addr_cache{
     uint64_t near[s_near];
     int next_slot;
