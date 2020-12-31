@@ -110,6 +110,7 @@ const char *print_type(inst_type insttype){
             ENUM_NAME(ADD);
             ENUM_NAME(RUN);
             ENUM_NAME(NOOP);
+            ENUM_NAME(SCOPY);
     }
     return NULL;
 }
