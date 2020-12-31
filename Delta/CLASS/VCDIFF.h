@@ -158,4 +158,7 @@ D_RT header_packer(FILE *delta,stream *stm);
 D_RT clean_code(code *cod);
 void count_int_len_test(void);
 void vcd_test(void);
+D_RT cache_init(addr_cache *cc);
+D_RT cache_update(addr_cache *cc,uint64_t addr);
+uint32_t count_int64_len(uint64_t integer);
 #endif /* VCDIFF_h */

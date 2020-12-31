@@ -55,7 +55,7 @@ D_RT init_encode(stream *stm){
 #define MIN_RUN_LEN 4
 //TODO: 还需搞清large match和small match之间的最优解原理
 D_RT match(stream *stm){
-    printf("\nSTRING MATCH: initial entry: %llu\n",stm->INPUT_POSITION);
+    printf("\nSTRING MATCH: initial entry: %llu\n",stm->TARGET->TARGET_WINDOW->START_POSITION);
     char *tgt_buffer=stm->TARGET->TARGET_WINDOW->BUFFER;
     //uint64_t curr_posi=stm->INPUT_POSITION;
     uint16_t tgtcrc;
@@ -96,6 +96,7 @@ D_RT match(stream *stm){
         }
         
         /*MARK: small match*/
+        //通常window窗口都很小
         
         
         
@@ -169,23 +170,26 @@ instruction_node *match_extend(uint64_t curr_posi,target_window *win,source *src
 
 
 void stream_match_test(void){
-    FILE *output=fopen("delta_file", "wb+");
+    FILE *output=fopen("38kB-54kB/2_1_unbm_delta_file", "wb+");
     stream *Stream=create_stream();
     target *Target=create_target();
     source *Source=create_source();
     //instruction *Instruction=create_instruction();
-    set_src_file(Source, "source_64B");
+    set_src_file(Source, "38kB-54kB/unbm_R2.bin");
     init_window(Source);
     global_source_hash(Source);
-    set_tgt_file(Target, "target_64B");
-    set_window(Target);
+    set_tgt_file(Target, "38kB-54kB/unbm_R1.bin");
     add_target(Stream, Target);
     add_source(Stream, Source);
-    init_encode(Stream);
-    match(Stream);
-    ADD_complement(Stream->TARGET->TARGET_WINDOW->INSTRUCTION, Stream->TARGET->TARGET_WINDOW);
     header_packer(output, Stream);
-    window_packer(output, Stream);
+    
+    while(set_window(Target)==D_OK){
+        init_encode(Stream);
+        match(Stream);
+        ADD_complement(Stream->TARGET->TARGET_WINDOW->INSTRUCTION, Stream->TARGET->TARGET_WINDOW);
+        window_packer(output, Stream);
+    }
+    fclose(output);
     delete_inst_list(Target->TARGET_WINDOW->INSTRUCTION);
     clean_source(Source);
     clean_target(Target);

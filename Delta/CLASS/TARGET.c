@@ -14,7 +14,7 @@ target *create_target(void){
     //tgt->WINDOW_COUNT=0;
     memset(tgt->TARGET_FILE, 0, sizeof(target_file));
     memset(tgt->TARGET_WINDOW,0,sizeof(target_window));
-    tgt->TARGET_WINDOW->BUFFER=(char *)malloc(DEFAULT_TARGET_WIN_SIZE*sizeof(char));
+    tgt->TARGET_WINDOW->BUFFER=(char *)malloc((DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2)*sizeof(char));
     tgt->TARGET_WINDOW->WIN_NUMBER=-1;
     return tgt;
 }
@@ -66,12 +66,12 @@ D_RT set_window(target *tgt){
     //使用固定的窗口切分方式
     target_window *tgtwin=tgt->TARGET_WINDOW;
     FILE *tgtf=tgt->TARGET_FILE->FILE_INSTANCE;
-    memset(tgtwin->BUFFER, 0, DEFAULT_TARGET_WIN_SIZE*sizeof(char));
+    memset(tgtwin->BUFFER, 0, (DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2)*sizeof(char));
     tgtwin->START_POSITION=ftell(tgtf);
     if(tgtwin->START_POSITION>=tgt->TARGET_FILE->FILE_SIZE)return D_EMPTY;//源文件已读完
     size_t data_remain=tgt->TARGET_FILE->FILE_SIZE-tgtwin->START_POSITION;
     
-    if(data_remain>=DEFAULT_TARGET_WIN_SIZE){
+    if(data_remain>=(DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2)){
         size_t size=fread((void *)tgtwin->BUFFER, 1, DEFAULT_TARGET_WIN_SIZE, tgtf);
         if(size!=DEFAULT_TARGET_WIN_SIZE){
             printf("\nERROR: error during reading target file in set window\n");

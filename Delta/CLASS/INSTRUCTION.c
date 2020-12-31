@@ -53,8 +53,10 @@ D_RT add_instructions(instruction *inst, instruction_node *inst_node,int number)
                 inst->FIRST_COPY=1;
             }else{//如果这个指令不是第一个copy指令，则比较现有的起始位置和新指令的起始位置之间的最小值，
                 //再比较跨度在最大值
+                uint64_t end_point=inst->START_POSITION+inst->LENGTH;
+                
                 inst->START_POSITION=delta_min(inst->START_POSITION, inst_node->DATA_or_ADDR.addr);
-                inst->LENGTH=delta_max(inst->LENGTH, inst_node->DATA_or_ADDR.addr+inst_node->SIZE-inst->START_POSITION);
+                inst->LENGTH=delta_max(end_point-inst->START_POSITION, inst_node->DATA_or_ADDR.addr+inst_node->SIZE-inst->START_POSITION);
             }
         }
         inst->INSTRUCTION_COUNT++;//增进指令计数
@@ -182,13 +184,22 @@ D_RT ADD_complement(instruction *inst,target_window *win){
         curr=curr->NEXT;
     }
     //TODO: 添加ADD最后一个时有BUG
-    uint64_t final=inst->TAIL->POSITION+inst->TAIL->SIZE;
-    if(win->BUFFER_SIZE>final){
-        instruction_node *new_add=new_inst_node(NULL, ADD, final, win->BUFFER_SIZE-final, &win->BUFFER[final], 0);
-        inst->TAIL->NEXT=new_add;
-        new_add->PREV=inst->TAIL;
+    if(inst->TAIL!=NULL){
+        uint64_t final=inst->TAIL->POSITION+inst->TAIL->SIZE;
+        if(win->BUFFER_SIZE>final){
+            instruction_node *new_add=new_inst_node(NULL, ADD, final, win->BUFFER_SIZE-final, &win->BUFFER[final], 0);
+            inst->TAIL->NEXT=new_add;
+            new_add->PREV=inst->TAIL;
+            inst->TAIL=new_add;
+            inst->INSTRUCTION_COUNT++;
+        }
+        
+    }else{
+        instruction_node *new_add=new_inst_node(NULL, ADD, 0, win->BUFFER_SIZE, win->BUFFER, 0);
         inst->TAIL=new_add;
+        inst->HEAD=new_add;
         inst->INSTRUCTION_COUNT++;
     }
+    
     return D_OK;
 }

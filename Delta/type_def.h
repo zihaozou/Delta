@@ -28,7 +28,7 @@
 #define SOURCE_WINDOW_SIZE 4096
 #define MAX_BLOCK_NUMBER 8
 #define CRC_LEN 8
-#define DEFAULT_TARGET_WIN_SIZE 2048
+#define DEFAULT_TARGET_WIN_SIZE 2048//原来2048
 #define s_near 4
 #define s_same 3
 #if s_near<=0
@@ -56,7 +56,8 @@ typedef enum _inst_type{
     COPY,
     ADD,
     RUN,
-    NOOP
+    NOOP,
+    SCOPY//self copy
 }inst_type;
 typedef union _data_addr{
     char *data;

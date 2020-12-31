@@ -15,6 +15,8 @@
 		FA1F19992593244700E46227 /* crcspeed.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1F19962593244700E46227 /* crcspeed.c */; };
 		FA1F199A2593244700E46227 /* crc16speed.c in Sources */ = {isa = PBXBuildFile; fileRef = FA1F19972593244700E46227 /* crc16speed.c */; };
 		FA24FBAC25997AD600267398 /* VCDIFF.c in Sources */ = {isa = PBXBuildFile; fileRef = FA24FBAB25997AD600267398 /* VCDIFF.c */; };
+		FA7DF491259C5B9A006F5705 /* ENCODER.c in Sources */ = {isa = PBXBuildFile; fileRef = FA7DF490259C5B9A006F5705 /* ENCODER.c */; };
+		FA7DF49A259C5D01006F5705 /* DECODER.c in Sources */ = {isa = PBXBuildFile; fileRef = FA7DF499259C5D01006F5705 /* DECODER.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -48,6 +50,10 @@
 		FA1F19982593244700E46227 /* crcspeed.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = crcspeed.h; sourceTree = "<group>"; };
 		FA24FBAA25997AD600267398 /* VCDIFF.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VCDIFF.h; sourceTree = "<group>"; };
 		FA24FBAB25997AD600267398 /* VCDIFF.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = VCDIFF.c; sourceTree = "<group>"; };
+		FA7DF48F259C5B9A006F5705 /* ENCODER.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ENCODER.h; sourceTree = "<group>"; };
+		FA7DF490259C5B9A006F5705 /* ENCODER.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ENCODER.c; sourceTree = "<group>"; };
+		FA7DF498259C5D01006F5705 /* DECODER.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DECODER.h; sourceTree = "<group>"; };
+		FA7DF499259C5D01006F5705 /* DECODER.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = DECODER.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,6 +91,10 @@
 				FA1B1A982590A85400660CD7 /* CLASS */,
 				FA1B1A8E258C4D9000660CD7 /* main.c */,
 				FA1B1A96258C4F2C00660CD7 /* type_def.h */,
+				FA7DF48F259C5B9A006F5705 /* ENCODER.h */,
+				FA7DF490259C5B9A006F5705 /* ENCODER.c */,
+				FA7DF498259C5D01006F5705 /* DECODER.h */,
+				FA7DF499259C5D01006F5705 /* DECODER.c */,
 			);
 			path = Delta;
 			sourceTree = "<group>";
@@ -181,7 +191,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA7DF49A259C5D01006F5705 /* DECODER.c in Sources */,
 				FA1F199A2593244700E46227 /* crc16speed.c in Sources */,
+				FA7DF491259C5B9A006F5705 /* ENCODER.c in Sources */,
 				FA1F19992593244700E46227 /* crcspeed.c in Sources */,
 				FA1B1A9F2590A88500660CD7 /* TARGET.c in Sources */,
 				FA24FBAC25997AD600267398 /* VCDIFF.c in Sources */,

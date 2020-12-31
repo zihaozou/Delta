@@ -7,11 +7,10 @@
 
 #include "VCDIFF.h"
 
-static D_RT cache_init(addr_cache *cc);
-static D_RT cache_update(addr_cache *cc,uint64_t addr);
+
 static uint64_t addr_encode(addr_cache* cc, uint64_t addr, uint64_t here, uint8_t* mode);
 //static uint32_t count_int_len(uint32_t integer);
-static uint32_t count_int64_len(uint64_t integer);
+
 static D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dataaddr);
 static D_RT code_instruction(instruction *inst,code *cod);
 static code *create_code(stream *stm);
@@ -26,9 +25,9 @@ static void win_header_writer(FILE *file,code *cod);
 D_RT header_packer(FILE *delta,stream *stm){
     byte temp=0x00;
     rewind(delta);
-    write_byte(delta, 'V');//V
-    write_byte(delta, 'C');//C
-    write_byte(delta, 'D');//D
+    write_byte(delta, 0xd6);//V
+    write_byte(delta, 0xc3);//C
+    write_byte(delta, 0xc4);//D
     write_byte(delta, SOFTWARE_VERSION);
     //if(stm->DECOMPRESS)temp=temp | 0x01;
     //if(stm->CODETABLE)temp=temp | 0x02;
@@ -233,14 +232,14 @@ static void win_header_writer(FILE *file,code *cod){
 
 
 
-static D_RT cache_init(addr_cache *cc){
+D_RT cache_init(addr_cache *cc){
     int i;
     cc->next_slot=0;
     for(i=0;i<s_near;i++)cc->near[i]=0;
     for (i=0; i<s_same*256; i++)cc->same[i]=0;
     return D_OK;
 }
-static D_RT cache_update(addr_cache *cc,uint64_t addr){
+D_RT cache_update(addr_cache *cc,uint64_t addr){
     cc->near[cc->next_slot]=addr;
     cc->next_slot=(cc->next_slot+1)%s_near;
     cc->same[addr%(s_same*256)]=addr;
@@ -268,7 +267,7 @@ static uint64_t addr_encode(addr_cache* cc, uint64_t addr, uint64_t here, uint8_
     *mode=bestm;
     return bestd;
 }
-static uint32_t count_int64_len(uint64_t integer){
+uint32_t count_int64_len(uint64_t integer){
     uint32_t len=0;
     while(integer || !len){
         integer=integer>>7;
