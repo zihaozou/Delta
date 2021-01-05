@@ -170,15 +170,15 @@ instruction_node *match_extend(uint64_t curr_posi,target_window *win,source *src
 
 
 void stream_match_test(void){
-    FILE *output=fopen("72kB-80kB/1_2_unbm_delta_file", "wb+");
+    FILE *output=fopen("test/delta_file", "wb+");
     stream *Stream=create_stream();
     target *Target=create_target();
     source *Source=create_source();
     //instruction *Instruction=create_instruction();
-    set_src_file(Source, "72kB-80kB/unbm_R1.bin");
+    set_src_file(Source, "test/source_64B");
     init_window(Source);
     global_source_hash(Source);
-    set_tgt_file(Target, "72kB-80kB/unbm_R2.bin");
+    set_tgt_file(Target, "test/target_64B");
     add_target(Stream, Target);
     add_source(Stream, Source);
     header_packer(output, Stream);

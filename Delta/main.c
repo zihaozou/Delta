@@ -7,17 +7,14 @@
 //#include "SOURCE.h"
 //#include "INSTRUCTION.h"
 //#include "TARGET.h"
-#include "STREAM.h"
-#include "VCDIFF.h"
+//#include "STREAM.h"
+//#include "VCDIFF.h"
 #include "DECODER.h"
+#include "ENCODER.h"
 //static source *Source;
 int main(int argc, const char * argv[]) {
-    //stream_match_test();
-    //count_int_len_test();
-    //vcd_test();
-    // insert code here...
-    //test_read_integer();
-    DECODER("72kB-80kB/1_2_unbm_delta_file", "72kB-80kB/unbm_R1.bin", "72kB-80kB/1_2_unbm_updated.bin");
-    printf("Hello, World!\n");
+    //ENCODER("test/old.bin","test/new.bin","test/delta_file");
+    DECODER("4k_4k_unbm/4k_4k_unbm_delta_file", "4k_4k_unbm/4k_4k_unbm_R1.bin", "4k_4k_unbm/4k_4k_unbm_updated.bin");
+    printf("\nDONE\n");
     return 0;
 }

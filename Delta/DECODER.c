@@ -11,15 +11,31 @@ typedef size_t dposition;
 
 
 
-
+#define DECODE_SOURCE_SIZE 1024
+#define DECODE_BLOCK_NUMBER 4
+typedef struct _decode_block{
+    int BLOCK_NUMBER;
+    byte *DATA;
+    size_t DATA_SIZE;
+    struct _decode_block *PREV;
+    struct _decode_block *NEXT;
+}decode_block;
 typedef struct _delta{
     FILE *FILE_INSTANCE;
     dsize FILE_SIZE;
     FILE *UPDATED_FILE;
     FILE *SOURCE_FILE;
     dsize SOURCE_SIZE;
-    //byte TARGET_BUFFER[DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2];
+    byte UPDATED_BUFFER[DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2];
     
+    dsize SOURCE_WIN_SIZE;
+    byte SOURCE_BUFFER[DECODE_SOURCE_SIZE];
+    decode_block DECODE_BLOCK_LIST[DECODE_BLOCK_NUMBER];
+    decode_block *CURRENT_BLOCK;
+    decode_block *HEAD;
+    decode_block *TAIL;
+    uint32_t BLOCK_COUNT;
+    uint8_t BLOCK_INPOOL;
     
     byte HDR_INDICATOR;
     //暂时没有二次压缩和自定义表
@@ -45,9 +61,156 @@ typedef struct _delta{
 }delta;
 
 
-delta *create_delta(const char *delta_name,const char *updated_name,const char *source_name);
+void init_delta(delta *del,const char *delta_name,const char *updated_name,const char *source_name);
 void set_win_header(delta *del);
 D_RT verify_file(delta *Del);
+
+D_RT init_source_lru(delta *del){
+    if(del->SOURCE_SEGMENT_LENGTH<=DECODE_SOURCE_SIZE){
+        fseek(del->SOURCE_FILE, del->SOURCE_SEGMENT_POSITION, SEEK_SET);
+        size_t rsize=fread(del->SOURCE_BUFFER, 1, del->SOURCE_SEGMENT_LENGTH,del->SOURCE_FILE);
+        if(rsize!=del->SOURCE_SEGMENT_LENGTH){
+            printf("\nERROR during read source segment\n");
+            return D_ERROR;
+        }
+        del->BLOCK_COUNT=1;
+        del->BLOCK_INPOOL=1;
+        del->HEAD=&del->DECODE_BLOCK_LIST[0];
+        del->TAIL=&del->DECODE_BLOCK_LIST[0];
+        del->DECODE_BLOCK_LIST[0].BLOCK_NUMBER=0;
+        del->DECODE_BLOCK_LIST[0].DATA=del->SOURCE_BUFFER;
+        del->DECODE_BLOCK_LIST[0].DATA_SIZE=del->SOURCE_SEGMENT_LENGTH;
+        del->DECODE_BLOCK_LIST[0].NEXT=NULL;
+        del->DECODE_BLOCK_LIST[0].PREV=NULL;
+        //del->SOURCE_WIN_SIZE=del->SOURCE_SEGMENT_LENGTH;
+    }else{
+        fseek(del->SOURCE_FILE, del->SOURCE_SEGMENT_POSITION, SEEK_SET);
+        size_t rsize=fread(del->SOURCE_BUFFER,1 , DECODE_SOURCE_SIZE,del->SOURCE_FILE);
+        if(rsize!=DECODE_SOURCE_SIZE){
+            printf("\nERROR during read source segment\n");
+            return D_ERROR;
+        }
+        uint64_t init_block_size=DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER;
+        //a = (b + (c - 1)) / c
+        del->BLOCK_COUNT=(uint32_t)(del->SOURCE_SEGMENT_LENGTH+(init_block_size-1))/init_block_size;
+        del->BLOCK_INPOOL=DECODE_BLOCK_NUMBER;
+        del->HEAD=&del->DECODE_BLOCK_LIST[0];
+        del->TAIL=&del->DECODE_BLOCK_LIST[DECODE_BLOCK_NUMBER-1];
+        for(int x=0;x<DECODE_BLOCK_NUMBER;x++){//设置每个block
+            del->DECODE_BLOCK_LIST[x].BLOCK_NUMBER=x;
+            del->DECODE_BLOCK_LIST[x].DATA=&del->SOURCE_BUFFER[x*init_block_size];
+            del->DECODE_BLOCK_LIST[x].DATA_SIZE=init_block_size;
+            if(x==0){
+                del->DECODE_BLOCK_LIST[x].PREV=NULL;
+                del->DECODE_BLOCK_LIST[x].NEXT=&del->DECODE_BLOCK_LIST[x+1];
+            }else if(x==DECODE_BLOCK_NUMBER-1){
+                del->DECODE_BLOCK_LIST[x].PREV=&del->DECODE_BLOCK_LIST[x-1];
+                del->DECODE_BLOCK_LIST[x].NEXT=NULL;
+            }else{
+                del->DECODE_BLOCK_LIST[x].PREV=&del->DECODE_BLOCK_LIST[x-1];
+                del->DECODE_BLOCK_LIST[x].NEXT=&del->DECODE_BLOCK_LIST[x+1];
+            }
+            //HASH_ADD_INT(lru->IN_POOL_BLOCK_HASH, BLOCK_NUMBER, &lru->blk_in_pool[x]);
+        }
+    }
+    del->CURRENT_BLOCK=&del->DECODE_BLOCK_LIST[0];
+    
+    return D_OK;
+}
+void decode_put_tail_to_head(delta *del,decode_block *blk){
+    blk->PREV->NEXT=NULL;
+    del->TAIL=blk->PREV;
+    blk->PREV=NULL;
+    blk->NEXT=del->HEAD;
+    del->HEAD->PREV=blk;
+    del->HEAD=blk;
+    return;
+}
+
+void decode_put_mid_to_head(delta *del,decode_block *blk){
+    blk->PREV->NEXT=blk->NEXT;
+    blk->NEXT->PREV=blk->PREV;
+    blk->PREV=NULL;
+    blk->NEXT=del->HEAD;
+    del->HEAD->PREV=blk;
+    del->HEAD=blk;
+    return;
+}
+
+decode_block *find_block_in_pool(delta *del,uint32_t blk_no){
+    for(int x=0;x<del->BLOCK_INPOOL;x++){
+        if(del->DECODE_BLOCK_LIST[x].BLOCK_NUMBER==blk_no)return &del->DECODE_BLOCK_LIST[x];
+    }
+    return NULL;
+}
+
+D_RT decode_get_block(delta *del,uint32_t blk_no){
+    if(del->CURRENT_BLOCK->BLOCK_NUMBER==blk_no)return D_OK;
+    decode_block *temp=find_block_in_pool(del, blk_no);
+    if (temp==NULL) {
+        size_t data_size;
+        uint32_t data_position=(uint32_t)del->SOURCE_SEGMENT_POSITION+(DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER)*blk_no;
+        temp=del->TAIL;
+        decode_put_tail_to_head(del,temp);
+        temp->BLOCK_NUMBER=blk_no;
+        if(blk_no==del->BLOCK_COUNT-1 && del->SOURCE_SEGMENT_LENGTH%(DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER)!=0){
+            data_size=del->SOURCE_SEGMENT_LENGTH%(DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER);
+        }else data_size=DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER;
+        memset(temp->DATA, 0, DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER);
+        fseek(del->SOURCE_FILE, data_position, SEEK_SET);
+        size_t size=fread(temp->DATA, 1, data_size, del->SOURCE_FILE);
+        if(size!=data_size){
+            printf("\nERROR: error during reading source file in get block, block number=%d\n",blk_no);
+            return D_ERROR;
+        }
+        temp->DATA_SIZE=data_size;
+        del->CURRENT_BLOCK=temp;
+    } else {
+        if(temp==del->TAIL){
+            decode_put_tail_to_head(del,temp);
+        }else{
+            decode_put_mid_to_head(del, temp);
+        }
+        del->CURRENT_BLOCK=temp;
+    }
+    
+    return D_OK;
+}
+
+D_RT copy_data(delta *del,dposition decode_posi, dposition addr,dsize siz){
+    uint64_t init_blk_size=(del->BLOCK_COUNT==1)?del->SOURCE_SEGMENT_LENGTH:(DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER);
+    uint32_t blk_no=(uint32_t)addr/(init_blk_size);
+    uint32_t local_position=(uint32_t)addr%(init_blk_size);
+    dsize data_remain;
+    while (siz) {
+        decode_get_block(del, blk_no);
+        data_remain=del->CURRENT_BLOCK->DATA_SIZE-local_position;
+        if(data_remain>=siz){
+            memcpy(&del->UPDATED_BUFFER[decode_posi], &del->CURRENT_BLOCK->DATA[local_position], siz);
+            siz=0;
+        }else{
+            memcpy(&del->UPDATED_BUFFER[decode_posi], &del->CURRENT_BLOCK->DATA[local_position], data_remain);
+            siz-=data_remain;
+            blk_no+=1;
+            local_position=0;
+            decode_posi+=data_remain;
+        }
+    }
+    return D_OK;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -98,23 +261,9 @@ D_RT decode_window(delta *del){
     FILE *delfile=del->FILE_INSTANCE;
     if(del->CURRENT_WIN_POSI!=ftell(delfile))return D_ERROR;
     set_win_header(del);
-    //memset(del->TARGET_BUFFER, 0, DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2);
-    if(del->SOURCE_SEGMENT_LENGTH>del->SOURCE_SIZE){
-        printf("\nERROR source segment size larger than source size\n");
-        return D_ERROR;
-    }else if(del->SOURCE_SEGMENT_POSITION>=del->SOURCE_SIZE){
-        printf("\nERROR source segment position exceeds the source size\n");
-        return D_ERROR;
-    }
-    dposition curr_decode_position=del->SOURCE_SEGMENT_LENGTH;
-    byte *merged_buffer=(byte *)malloc(sizeof(byte)*(del->SOURCE_SEGMENT_LENGTH+del->LENGTH_TARGET_WIN));
-    //curr_decode_position=&merged_buffer[del->SOURCE_SEGMENT_LENGTH];
-    fseek(del->SOURCE_FILE, del->SOURCE_SEGMENT_POSITION, SEEK_SET);
-    size_t read_size=fread(merged_buffer, 1, del->SOURCE_SEGMENT_LENGTH, del->SOURCE_FILE);
-    if(read_size!=del->SOURCE_SEGMENT_LENGTH){
-        printf("\nERROR during reading source segment\n");
-        return D_ERROR;
-    }
+    init_source_lru(del);//初始化lru
+    memset(del->UPDATED_BUFFER, 0, DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2);
+    dposition curr_decode_position=0;
     //reading delta routine
     dposition inst_posi=del->CURRENT_INST_POSI;
     dposition addr_posi=del->CURRENT_ADDR_POSI;
@@ -141,7 +290,7 @@ D_RT decode_window(delta *del){
                     addr=read_integer_at(delfile, addr_posi);
                     addr_posi=ftell(delfile);
                 }else if (mode==VCD_HERE){
-                    addr=curr_decode_position-read_integer_at(delfile, addr_posi);
+                    addr=curr_decode_position+del->SOURCE_SEGMENT_LENGTH-read_integer_at(delfile, addr_posi);
                     addr_posi=ftell(delfile);
                 }else if((m=mode-2)>=0 && m<s_near){
                     addr=cache.near[m]+read_integer_at(delfile, addr_posi);
@@ -153,7 +302,7 @@ D_RT decode_window(delta *del){
                 }
                 cache_update(&cache, addr);
                 //读取数据
-                memcpy(&merged_buffer[curr_decode_position], &merged_buffer[addr], size);
+                copy_data(del, curr_decode_position, addr, size);
                 curr_decode_position+=size;
                 break;
             case ADD:
@@ -165,7 +314,7 @@ D_RT decode_window(delta *del){
                     size=DeltaDefaultCodeTable[2][instcode];
                 }
                 //读取数据
-                read_bytes_at(delfile, size, data_posi, &merged_buffer[curr_decode_position]);
+                read_bytes_at(delfile, size, data_posi, &del->UPDATED_BUFFER[curr_decode_position]);
                 data_posi=ftell(delfile);
                 curr_decode_position+=size;
                 break;
@@ -173,7 +322,7 @@ D_RT decode_window(delta *del){
                 //设置size
                 size=read_integer_at(delfile, inst_posi);
                 inst_posi=ftell(delfile);
-                memset(&merged_buffer[curr_decode_position], read_byte_at(delfile, data_posi), size);
+                memset(&del->UPDATED_BUFFER[curr_decode_position], read_byte_at(delfile, data_posi), size);
                 data_posi=ftell(delfile);
                 curr_decode_position+=size;
                 break;
@@ -181,8 +330,8 @@ D_RT decode_window(delta *del){
                 break;
         }
     }
-    fwrite(&merged_buffer[del->SOURCE_SEGMENT_LENGTH], del->LENGTH_TARGET_WIN, 1, del->UPDATED_FILE);
-    free(merged_buffer);
+    fwrite(del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN, 1, del->UPDATED_FILE);
+    //free(merged_buffer);
     fseek(delfile,del->NEXT_WIN_POSI,SEEK_SET);
     del->CURRENT_WIN_POSI=del->NEXT_WIN_POSI;
     return D_OK;
@@ -214,42 +363,45 @@ void test_read_integer(void){
         integer|=(temp & (~0x80));
     } while (temp & 0x80);
 }
-
+static delta del;
 void DECODER(const char *delta_name,const char *source_name,const char *updated_name){
-    delta *Del=create_delta(delta_name,updated_name,source_name);
-    if(verify_file(Del)==D_ERROR){
+    //delta *Del=create_delta(delta_name,updated_name,source_name);
+    init_delta(&del, delta_name, updated_name, source_name);
+    if(verify_file(&del)==D_ERROR){
         printf("\nERROR delta file incorrect\n");
         exit(0);
     }
-    set_HDR(Del);
-    set_first_win(Del);
-    while(Del->NEXT_WIN_POSI<Del->FILE_SIZE){
-        decode_window(Del);
+    set_HDR(&del);
+    set_first_win(&del);
+    while(del.NEXT_WIN_POSI<del.FILE_SIZE){
+        decode_window(&del);
     }
-    fclose(Del->UPDATED_FILE);
+    fclose(del.SOURCE_FILE);
+    fclose(del.FILE_INSTANCE);
+    fclose(del.UPDATED_FILE);
     
 }
 
-delta *create_delta(const char *delta_name,const char *updated_name,const char *source_name){
-    delta *Delta=(delta *)malloc(sizeof(delta));
-    Delta->FILE_INSTANCE=fopen(delta_name, "rb+");
-    if(Delta->FILE_INSTANCE==NULL){
+void init_delta(delta *del,const char *delta_name,const char *updated_name,const char *source_name){
+    //delta *Delta=(delta *)malloc(sizeof(delta));
+    del->FILE_INSTANCE=fopen(delta_name, "rb+");
+    if(del->FILE_INSTANCE==NULL){
         printf("\nERROR during reading delta file\n");
         exit(0);
     }
-    fseek(Delta->FILE_INSTANCE, 0, SEEK_END);
-    Delta->FILE_SIZE=(dsize)ftell(Delta->FILE_INSTANCE);
-    rewind(Delta->FILE_INSTANCE);
-    Delta->UPDATED_FILE=fopen(updated_name, "wb+");
-    Delta->SOURCE_FILE=fopen(source_name, "rb+");
-    if(Delta->SOURCE_FILE==NULL){
+    fseek(del->FILE_INSTANCE, 0, SEEK_END);
+    del->FILE_SIZE=(dsize)ftell(del->FILE_INSTANCE);
+    rewind(del->FILE_INSTANCE);
+    del->UPDATED_FILE=fopen(updated_name, "wb+");
+    del->SOURCE_FILE=fopen(source_name, "rb+");
+    if(del->SOURCE_FILE==NULL){
         printf("\nERROR during reading source file\n");
         exit(0);
     }
-    fseek(Delta->SOURCE_FILE, 0, SEEK_END);
-    Delta->SOURCE_SIZE=(dsize)ftell(Delta->SOURCE_FILE);
-    rewind(Delta->SOURCE_FILE);
-    return Delta;
+    fseek(del->SOURCE_FILE, 0, SEEK_END);
+    del->SOURCE_SIZE=(dsize)ftell(del->SOURCE_FILE);
+    rewind(del->SOURCE_FILE);
+    return;
 }
 
 
