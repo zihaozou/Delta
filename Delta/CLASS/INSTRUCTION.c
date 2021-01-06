@@ -63,6 +63,9 @@ D_RT add_instructions(instruction *inst, instruction_node *inst_node,int number)
         if(inst_node->INST_TYPE==COPY){
             printf("\n*******************\nNEW INSTRUCTION: a new instruction has added\nTYPE:COPY\nPOSITION:%llu\nSIZE:%llu\nADDR:%llu\n*******************\n",inst_node->POSITION,inst_node->SIZE,
                    inst_node->DATA_or_ADDR.addr);
+        }else if(inst_node->INST_TYPE==SCOPY){
+            printf("\n*******************\nNEW INSTRUCTION: a new instruction has added\nTYPE:SCOPY\nPOSITION:%llu\nSIZE:%llu\nADDR:%llu\n*******************\n",inst_node->POSITION,inst_node->SIZE,
+                   inst_node->DATA_or_ADDR.addr);
         }else{
             printf("\n*******************\nNEW INSTRUCTION: a new instruction has added\nTYPE:ADD or RUN\n*******************\n");
         }
@@ -109,7 +112,7 @@ instruction_node *new_inst_node(instruction_node *prev/*可选*/,inst_type type,
     ins_nd->POSITION=posi;
     ins_nd->SIZE=size;
     ins_nd->INST_TYPE=type;
-    if(type==COPY)ins_nd->DATA_or_ADDR.addr=addr;
+    if(type==COPY || type==SCOPY)ins_nd->DATA_or_ADDR.addr=addr;
     else ins_nd->DATA_or_ADDR.data=data;
     return ins_nd;
 }

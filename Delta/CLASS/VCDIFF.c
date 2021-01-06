@@ -141,6 +141,12 @@ static D_RT code_instruction(instruction *inst,code *cod){
             instcode=(curr_nd->SIZE>=1 && curr_nd->SIZE<=17)?curr_nd->SIZE+1:1;
             add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
             PRINT_DELTA(ADD,instcode);
+        }else if (curr_nd->INST_TYPE==SCOPY){
+            local.addr=curr_nd->DATA_or_ADDR.addr+inst->LENGTH;
+            local.addr=addr_encode(&cache, local.addr, curr_nd->POSITION+inst->LENGTH, &mode);
+            instcode=19+mode*16+((curr_nd->SIZE<=18 && curr_nd->SIZE>=4)?curr_nd->SIZE-3:0);
+            add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+            PRINT_DELTA(SCOPY,instcode);
         }
         
         curr_nd=curr_nd->NEXT;

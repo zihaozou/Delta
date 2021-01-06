@@ -182,20 +182,27 @@ D_RT copy_data(delta *del,dposition decode_posi, dposition addr,dsize siz){
     uint32_t blk_no=(uint32_t)addr/(init_blk_size);
     uint32_t local_position=(uint32_t)addr%(init_blk_size);
     dsize data_remain;
-    while (siz) {
-        decode_get_block(del, blk_no);
-        data_remain=del->CURRENT_BLOCK->DATA_SIZE-local_position;
-        if(data_remain>=siz){
-            memcpy(&del->UPDATED_BUFFER[decode_posi], &del->CURRENT_BLOCK->DATA[local_position], siz);
-            siz=0;
-        }else{
-            memcpy(&del->UPDATED_BUFFER[decode_posi], &del->CURRENT_BLOCK->DATA[local_position], data_remain);
-            siz-=data_remain;
-            blk_no+=1;
-            local_position=0;
-            decode_posi+=data_remain;
+    if(addr>=del->SOURCE_SEGMENT_LENGTH){//scopy
+        for (int x=0; x<siz; x++) {
+            del->UPDATED_BUFFER[decode_posi+x]=del->UPDATED_BUFFER[addr-del->SOURCE_SEGMENT_LENGTH+x];
+        }
+    }else{
+        while (siz) {//copy
+            decode_get_block(del, blk_no);
+            data_remain=del->CURRENT_BLOCK->DATA_SIZE-local_position;
+            if(data_remain>=siz){
+                memcpy(&del->UPDATED_BUFFER[decode_posi], &del->CURRENT_BLOCK->DATA[local_position], siz);
+                siz=0;
+            }else{
+                memcpy(&del->UPDATED_BUFFER[decode_posi], &del->CURRENT_BLOCK->DATA[local_position], data_remain);
+                siz-=data_remain;
+                blk_no+=1;
+                local_position=0;
+                decode_posi+=data_remain;
+            }
         }
     }
+    
     return D_OK;
 }
 
@@ -363,6 +370,11 @@ void test_read_integer(void){
         integer|=(temp & (~0x80));
     } while (temp & 0x80);
 }
+
+
+
+
+
 static delta del;
 void DECODER(const char *delta_name,const char *source_name,const char *updated_name){
     //delta *Del=create_delta(delta_name,updated_name,source_name);

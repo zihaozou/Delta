@@ -51,14 +51,15 @@ D_RT init_encode(stream *stm){
 //TODO: 现在先只考虑large match的情况，等到完成了之后，需要添加RUN和small
 //match，这三种情况会在匹配时全部进行一遍，然后由instuction里面的instruction_mediator调和三种情况的结果，选出最优
 //解。在我们的情况中，我们无需考虑lazymatch的问题，因为在匹配阶段我们就已经找到了全局的最优解，可以直接跳过已匹配的部分，
-
 #define MIN_RUN_LEN 4
+static source_hash *small_hashtable=NULL;
 //TODO: 还需搞清large match和small match之间的最优解原理
 D_RT match(stream *stm){
     printf("\nSTRING MATCH: initial entry: %llu\n",stm->TARGET->TARGET_WINDOW->START_POSITION);
     char *tgt_buffer=stm->TARGET->TARGET_WINDOW->BUFFER;
     //uint64_t curr_posi=stm->INPUT_POSITION;
     uint16_t tgtcrc;
+    uint16_t smallcrc;
     source_hash *s;
     source_hash *hashtable=stm->SOURCE->SOURCE_HASH;
     instruction *inst=stm->TARGET->TARGET_WINDOW->INSTRUCTION;
@@ -89,15 +90,32 @@ D_RT match(stream *stm){
             tgtcrc=crc16speed(0, &tgt_buffer[stm->INPUT_POSITION], CRC_LEN);
             HASH_FIND(hh, hashtable, &tgtcrc, 2, s);
             if(s!=NULL){
-                instruction_node *inst_node=match_extend(stm->INPUT_POSITION,stm->TARGET->TARGET_WINDOW,stm->SOURCE,s);
+                instruction_node *inst_node=match_extend(1,stm->INPUT_POSITION,stm->TARGET->TARGET_WINDOW,stm->SOURCE,s);
                 if(inst_node!=NULL)add_instructions(stm->TARGET->TARGET_WINDOW->INSTRUCTION, inst_node, 1);
                 
             }
         }
+
         
         /*MARK: small match*/
         //通常window窗口都很小
-        
+#define SMALL_HASH_LEN 4
+        if(stm->INPUT_REMAINING>=SMALL_HASH_LEN){
+            smallcrc=crc16speed(0, &tgt_buffer[stm->INPUT_POSITION], SMALL_HASH_LEN);
+            HASH_FIND(hh, small_hashtable, &smallcrc, 2, s);
+            if(s!=NULL){
+                instruction_node *inst_node=match_extend(0,stm->INPUT_POSITION,stm->TARGET->TARGET_WINDOW,stm->SOURCE,s);
+                if(inst_node!=NULL)add_instructions(stm->TARGET->TARGET_WINDOW->INSTRUCTION, inst_node, 1);
+                add_position(s, (int)stm->INPUT_POSITION);
+            }else{
+                s = (source_hash *)malloc(sizeof(source_hash));
+                s->crc=smallcrc;
+                s->cnt=0;
+                s->head=NULL;
+                add_position(s,(int)stm->INPUT_POSITION);
+                HASH_ADD(hh, small_hashtable, crc, 2, s);
+            }
+        }
         
         
         
@@ -115,8 +133,7 @@ D_RT match(stream *stm){
     
     return D_OK;
 }
-
-instruction_node *match_extend(uint64_t curr_posi,target_window *win,source *src,source_hash *sh){
+instruction_node *match_extend(uint8_t issource,uint64_t curr_posi,target_window *win,source *src,source_hash *sh){
     source_position *p=sh->head;
     uint64_t try_src_start;
     uint64_t try_tgt_start;
@@ -133,39 +150,57 @@ instruction_node *match_extend(uint64_t curr_posi,target_window *win,source *src
         //try_tgt_end=curr_posi;
         try_tgt_start=curr_posi;
         try_size=0;
-        try_size_max=delta_min(src->SOURCE_FILE->FILE_SIZE-try_src_start-1, win->BUFFER_SIZE-try_tgt_start-1);
-        
-        //FORWARD EXTEND
-        while(try_size<=try_size_max&&get_char_at(src, (uint32_t)(try_src_start+try_size))==win->BUFFER[try_tgt_start+try_size]){
-            try_size++;
-        }
         
         
         
-        //BACKWARD EXTEND
-        while(try_src_start>0 && try_tgt_start>0){
-            if(get_char_at(src, (uint32_t)try_src_start-1)==win->BUFFER[try_tgt_start-1]){
-                try_src_start--;
-                try_tgt_start--;
-                try_size++;}
-            else break;
-        }
-        
-        //比较
-        if(try_size>=max_length){
-            tgt_start_point=try_tgt_start;
-            src_start_point=try_src_start;
-            max_length=try_size;
+        if(issource){
+            try_size_max=delta_min(src->SOURCE_FILE->FILE_SIZE-try_src_start-1, win->BUFFER_SIZE-try_tgt_start-1);
+            //FORWARD EXTEND
+            while(try_size<=try_size_max&&get_char_at(src, (uint32_t)(try_src_start+try_size))==win->BUFFER[try_tgt_start+try_size]){
+                try_size++;
+            }
+            //BACKWARD EXTEND
+            while(try_src_start>0 && try_tgt_start>0){
+                if(get_char_at(src, (uint32_t)try_src_start-1)==win->BUFFER[try_tgt_start-1]){
+                    try_src_start--;
+                    try_tgt_start--;
+                    try_size++;}
+                else break;
+            }
+            if(try_size>=max_length){//比较
+                tgt_start_point=try_tgt_start;
+                src_start_point=try_src_start;
+                max_length=try_size;
+            }
+        }else/*small match只需要做forwardmatch，并且无需考虑最大进步值*/{
+            while(try_tgt_start<win->BUFFER_SIZE && win->BUFFER[try_tgt_start]==win->BUFFER[try_src_start]){
+                try_tgt_start++;
+                try_src_start++;
+                try_size++;
+            }
+            if(try_size>=max_length){
+                max_length=try_size;
+                src_start_point=p->position;
+            }
         }
         p=p->next;
     }
-    if(max_length>=CRC_LEN/*暂时设置为crc的长度*/){
-        instruction_node *inst_node=new_inst_node(NULL, COPY, tgt_start_point,max_length, NULL, src_start_point);
-        return inst_node;
+    if(issource){//再次检查总长度，如果超过阀值则生成node，如果不超过则返回NULL
+        if(max_length>=CRC_LEN/*暂时设置为crc的长度*/){
+            instruction_node *inst_node=new_inst_node(NULL, COPY, tgt_start_point,max_length, NULL, src_start_point);
+            return inst_node;
+        }
+        else return NULL;
+    }else{
+        if(max_length>=SMALL_HASH_LEN/*暂时设置为crc的长度*/){
+            instruction_node *inst_node=new_inst_node(NULL, SCOPY, curr_posi, max_length, NULL, src_start_point);
+            return inst_node;
+        }else return NULL;
     }
     
-    else return NULL;
-    //再次检查总长度，如果超过阀值则生成node，如果不超过则返回NULL
+    
+    
+    
 }
 
 

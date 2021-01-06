@@ -21,7 +21,7 @@ D_RT init_encode(stream *stm);//这个函数会检查encode之前所有的准备
                             //和input_remaining设置好
 D_RT match(stream *stm);//这个函数会从input_position开始
 //循环查找一个与源文件哈希表匹配的目标子字符串
-instruction_node *match_extend(uint64_t curr_posi,target_window *win,source *src,source_hash *sh);
+instruction_node *match_extend(uint8_t issource,uint64_t curr_posi,target_window *win,source *src,source_hash *sh);
 
 void stream_match_test(void);
 #endif /* STREAM_h */
