@@ -38,7 +38,13 @@ D_RT delete_inst_list(instruction *inst){
 D_RT add_instructions(instruction *inst, instruction_node *inst_node,int number){
     int x=0;
     while(inst_node!=NULL && x<number){
-        instructions_mediator(inst,inst_node);//首先调和新COPY和旧指令之间的指令冲突
+        if(instructions_mediator(inst,inst_node)==D_DISCARD){
+            instruction_node *temp=inst_node;
+            inst_node=inst_node->NEXT;//进入下一新指令
+            x++;
+            free(temp);
+            continue;
+        }//首先调和新COPY和旧指令之间的指令冲突
         inst_node->PREV=inst->TAIL;//让新指令的prev指针指向list的末尾，如果末尾为空的话，那就会指向NULL
         if(inst->INSTRUCTION_COUNT==0)inst->HEAD=inst_node;//如果指令list为空，则将指令头指向新指令
         else{//如果不为空，则将指令尾的元素的下一指令指针指向新指令
@@ -123,7 +129,7 @@ instruction_node *new_inst_node(instruction_node *prev/*可选*/,inst_type type,
 /// @param inst_node <#inst_node description#>
 D_RT instructions_mediator(instruction *inst, instruction_node *inst_node){
     if(inst->INSTRUCTION_COUNT==0 || inst->TAIL==NULL)return D_EMPTY;
-    if(inst_node->INST_TYPE!=COPY)return D_OK;
+    if(inst_node->INST_TYPE==ADD)return D_OK;
     instruction_node *temp=inst->TAIL;
     instruction_node *temp2;
     while(temp!=NULL){
@@ -141,16 +147,22 @@ D_RT instructions_mediator(instruction *inst, instruction_node *inst_node){
                         temp2->SIZE=temp2->SIZE-(endpoint-inst_node->POSITION+1);
                     }
                     break;
+                case SCOPY:
                 case COPY:
                     if(inst_node->POSITION<=temp2->POSITION){//完全覆盖了原COPY指令，删除原COPY
                         delete_instruction_node(inst, temp2);
                     }else{//没有完全覆盖，修改新COPY指令的target起始地址和size和addr
                         uint64_t cover=endpoint-inst_node->POSITION+1;
+                        if(cover>inst_node->SIZE)
+                            return D_DISCARD;
+                        //这里有bug，size减完直接变负数了
                         inst_node->SIZE-=cover;
                         inst_node->POSITION+=cover;
                         inst_node->DATA_or_ADDR.addr+=cover;
                     }
                     break;
+                
+                    
                 default:
                     break;
             }
@@ -166,9 +178,10 @@ D_RT instructions_mediator(instruction *inst, instruction_node *inst_node){
 
 
 
-D_RT ADD_complement(instruction *inst,target_window *win){
+uint32_t ADD_complement(instruction *inst,target_window *win){
     uint64_t next_start=0;
     instruction_node *curr=inst->HEAD;
+    uint32_t add_size=0;
     while(curr!=NULL){
         if(next_start<curr->POSITION){
             instruction_node *new_add=new_inst_node(NULL, ADD, next_start, curr->POSITION-next_start, &win->BUFFER[next_start], 0);

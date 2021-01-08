@@ -50,7 +50,8 @@ typedef enum delta_return{
     D_EMPTY,
     D_NONE,
     D_EXIST,
-    D_NONEXIST
+    D_NONEXIST,
+    D_DISCARD
 }D_RT;
 typedef enum _inst_type{
     COPY,
