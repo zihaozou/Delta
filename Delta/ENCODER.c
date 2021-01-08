@@ -11,6 +11,7 @@
 
 void ENCODER(const char *source_name,const char *target_name,const char *delta_name){
     FILE *output=fopen(delta_name, "wb+");
+    uint32_t add_size;
     stream *Stream=create_stream();
     target *Target=create_target();
     source *Source=create_source();
@@ -26,8 +27,9 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
     while(set_window(Target)==D_OK){
         init_encode(Stream);
         match(Stream);
-        ADD_complement(Stream->TARGET->TARGET_WINDOW->INSTRUCTION, Stream->TARGET->TARGET_WINDOW);
+        add_size=ADD_complement(Stream->TARGET->TARGET_WINDOW->INSTRUCTION, Stream->TARGET->TARGET_WINDOW);
         window_packer(output, Stream);
+        rearrange_source_file(Stream, add_size);
     }
     fclose(output);
     delete_inst_list(Target->TARGET_WINDOW->INSTRUCTION);

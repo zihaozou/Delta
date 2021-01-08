@@ -185,6 +185,7 @@ uint32_t ADD_complement(instruction *inst,target_window *win){
     while(curr!=NULL){
         if(next_start<curr->POSITION){
             instruction_node *new_add=new_inst_node(NULL, ADD, next_start, curr->POSITION-next_start, &win->BUFFER[next_start], 0);
+            add_size+=curr->POSITION-next_start;
             if(curr==inst->HEAD){
                 inst->HEAD=new_add;
             }else{
@@ -204,6 +205,7 @@ uint32_t ADD_complement(instruction *inst,target_window *win){
         uint64_t final=inst->TAIL->POSITION+inst->TAIL->SIZE;
         if(win->BUFFER_SIZE>final){
             instruction_node *new_add=new_inst_node(NULL, ADD, final, win->BUFFER_SIZE-final, &win->BUFFER[final], 0);
+            add_size+=win->BUFFER_SIZE-final;
             inst->TAIL->NEXT=new_add;
             new_add->PREV=inst->TAIL;
             inst->TAIL=new_add;
@@ -212,10 +214,11 @@ uint32_t ADD_complement(instruction *inst,target_window *win){
         
     }else{
         instruction_node *new_add=new_inst_node(NULL, ADD, 0, win->BUFFER_SIZE, win->BUFFER, 0);
+        add_size+=win->BUFFER_SIZE;
         inst->TAIL=new_add;
         inst->HEAD=new_add;
         inst->INSTRUCTION_COUNT++;
     }
     
-    return D_OK;
+    return add_size;
 }

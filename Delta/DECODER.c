@@ -51,7 +51,7 @@ typedef struct _delta{
     dsize LEN_INST;
     dsize LEN_ADDR;
     
-    
+    dposition TARGET_POSI;
     
     dposition CURRENT_WIN_POSI;
     dposition NEXT_WIN_POSI;
@@ -234,6 +234,7 @@ void set_first_win(delta *del){
     fseek(del->FILE_INSTANCE, 5, SEEK_SET);
     del->CURRENT_WIN_POSI=ftell(del->FILE_INSTANCE);
     del->NEXT_WIN_POSI=0;
+    del->TARGET_POSI=0;
     return;
 }
 uint64_t read_integer(FILE *f){
@@ -263,6 +264,7 @@ byte read_byte_at(FILE *f,dposition location){
     return getc(f);
 }
 D_RT decode_window(delta *del){
+    uint32_t add_size=0;
     addr_cache cache;
     cache_init(&cache);
     FILE *delfile=del->FILE_INSTANCE;
@@ -324,6 +326,7 @@ D_RT decode_window(delta *del){
                 read_bytes_at(delfile, size, data_posi, &del->UPDATED_BUFFER[curr_decode_position]);
                 data_posi=ftell(delfile);
                 curr_decode_position+=size;
+                add_size+=size;
                 break;
             case RUN:
                 //设置size
@@ -337,6 +340,19 @@ D_RT decode_window(delta *del){
                 break;
         }
     }
+    byte *temp=(void *)malloc(sizeof(del->SOURCE_SIZE));
+    fseek(del->SOURCE_FILE, 0, SEEK_SET);
+    fread(temp, 1, del->SOURCE_SIZE, del->SOURCE_FILE);
+    memmove(&temp[del->TARGET_POSI+add_size], &temp[del->TARGET_POSI], del->SOURCE_SIZE-del->TARGET_POSI);
+    memcpy(&temp[del->TARGET_POSI], del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN);
+    del->SOURCE_SIZE=delta_max(del->SOURCE_SIZE+add_size, del->TARGET_POSI+del->LENGTH_TARGET_WIN);
+    fseek(del->SOURCE_FILE, 0, SEEK_SET);
+    fwrite(temp, del->SOURCE_SIZE, 1, del->SOURCE_FILE);
+    del->TARGET_POSI+=del->LENGTH_TARGET_WIN;
+    free(temp);
+    
+    
+    
     fwrite(del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN, 1, del->UPDATED_FILE);
     //free(merged_buffer);
     fseek(delfile,del->NEXT_WIN_POSI,SEEK_SET);

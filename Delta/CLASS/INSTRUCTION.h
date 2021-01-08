@@ -19,5 +19,5 @@ instruction_node *new_inst_node(instruction_node *prev/*可选*/,inst_type type,
 D_RT instructions_mediator(instruction *inst, instruction_node *inst_node);
 D_RT delete_instruction_node(instruction *inst, instruction_node *inst_node);
 D_RT delete_inst_list(instruction *inst);//TODO: 实现删除操作
-D_RT ADD_complement(instruction *inst,target_window *win);
+uint32_t ADD_complement(instruction *inst,target_window *win);
 #endif /* INSTRUCTION_h */
