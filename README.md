@@ -1,5 +1,5 @@
 # Delta
-Delta compression for device with limited resource. I designed this software for enabling delta compression for SoC devices. SoC devices typically have limited resource and small package data. This software can be applied to wide-range firmware update for IoT networks. 
+Delta compression for device with limited resource. I designed this software for enabling delta compression for SoC devices, which typically have limited resource and small package data. This software can be applied to wide-range firmware update for IoT networks. 
 
 ## FEATURES:
 
