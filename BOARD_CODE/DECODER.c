@@ -1,26 +1,3 @@
-/*
-MIT License
-
-Copyright (c) 2021 ZihaoZou
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
 //
 //  DECODER.c
 //  Delta
@@ -460,7 +437,7 @@ D_RT copy_data(delta *del,dposition decode_posi, dposition addr,dsize siz){
 void set_HDR(delta *del){
     del->HDR_INDICATOR=read_byte(&del->DELTA_FILE);
 	if(del->HDR_INDICATOR&(1<<2))del->DECODE_MODE=1;
-	else if(del->HDR_INDICATOR&(1<<3)){
+	else if(del->HDR_INDICATOR&(1<<3)){//如果读到的模式为2和3，则设置目标文件的地址为源文件的地址，以达到直接覆盖源文件的功能
 		del->DECODE_MODE=1;
 		del->UPDATED_FILE.FileBeginAddr=DEFAULT_SOURCE_DATA_POSITION;
 	}
@@ -484,8 +461,8 @@ void set_HDR(delta *del){
 *****************************************************************************/
 void set_first_win(delta *del){
     //del->DELTA_FILE.FileOffset=5;
-    del->CURRENT_WIN_POSI=del->DELTA_FILE.FileOffset;
-    del->NEXT_WIN_POSI=0;
+    del->CURRENT_WIN_POSI=del->DELTA_FILE.FileOffset;//设置当前窗口的位置
+    del->NEXT_WIN_POSI=0;//下一窗口的位置被暂时设置为0，后面解析窗口时会重新设置
     return;
 }
 /*****************************************************************************
@@ -499,7 +476,7 @@ void set_first_win(delta *del){
  * 调用关系  :
  * 其    它  :
 *****************************************************************************/
-D_RT set_file_size(delta *del){
+D_RT set_file_size(delta *del){//设置源文件和目标文件大小
 	del->UPDATED_SIZE=read_integer(&del->DELTA_FILE);
 	del->SOURCE_SIZE=read_integer(&del->DELTA_FILE);
 	//TODO: 这里需要与设备之前记录的源文件大小作比较，如果不一样则返回错误
@@ -518,13 +495,13 @@ D_RT set_file_size(delta *del){
  * 其    它  :
 *****************************************************************************/
 D_RT decode_window(delta *del){
-    dsize add_size=0;
-    memset(&cache,0,sizeof(cache));
+    dsize add_size=0;//用于记录一个窗口内add指令的size和
+    memset(&cache,0,sizeof(cache));//初始化地址缓存
     dfile *delfile=&del->DELTA_FILE;
     if(del->CURRENT_WIN_POSI!=delfile->FileOffset)return D_ERROR;
     set_win_header(del);
     init_source_lru(del);//初始化lru
-    memset(del->UPDATED_BUFFER, 0, FLASH_PAGE_SIZE);
+    memset(del->UPDATED_BUFFER, 0, DEFAULT_UPDATED_WIN_SIZE);
     dposition curr_decode_position=0;
     //reading delta routine
     dposition inst_posi=del->CURRENT_INST_POSI;
@@ -538,7 +515,7 @@ D_RT decode_window(delta *del){
 	dsize copy_size;
 	dposition left_mark;
 	dsize extended_size;
-    while(inst_posi<del->CURRENT_ADDR_POSI){
+    while(inst_posi<del->CURRENT_ADDR_POSI){//
         instcode=read_byte_at(delfile, inst_posi);
         inst_posi++;
         switch (DeltaDefaultCodeTable[0][instcode]) {
@@ -597,25 +574,24 @@ D_RT decode_window(delta *del){
                 break;
         }
     }
-	//FLASH_PAGE_SIZE 2048
-	if(del->DECODE_MODE==3){
+	if(del->DECODE_MODE==3){//mode3：将整个源文件后退
 		left_mark=del->SOURCE_SIZE;
 		extended_size=del->SOURCE_SIZE+add_size;
 		while(left_mark-del->UPDATED_FILE.FileOffset){
-			copy_size=(extended_size%FLASH_PAGE_SIZE==0)?delta_min(left_mark-del->UPDATED_FILE.FileOffset,
-			FLASH_PAGE_SIZE):extended_size%FLASH_PAGE_SIZE;
-			memset(del->MOVE_DATA_BUFFER,0,FLASH_PAGE_SIZE);
+			copy_size=(extended_size%DEFAULT_UPDATED_WIN_SIZE==0)?delta_min(left_mark-del->UPDATED_FILE.FileOffset,
+			DEFAULT_UPDATED_WIN_SIZE):extended_size%DEFAULT_UPDATED_WIN_SIZE;
+			memset(del->MOVE_DATA_BUFFER,0,DEFAULT_UPDATED_WIN_SIZE);
 			readFlashData ( del->SOURCE_FILE.FileBeginAddr+left_mark-copy_size, del->MOVE_DATA_BUFFER, copy_size );
-			dest_page=del->SOURCE_FILE.FileBeginAddr+((extended_size+(FLASH_PAGE_SIZE-1))
-			/FLASH_PAGE_SIZE-1)*FLASH_PAGE_SIZE;
-			eraseFlashData ( dest_page, FLASH_PAGE_SIZE );
+			dest_page=del->SOURCE_FILE.FileBeginAddr+((extended_size+(DEFAULT_UPDATED_WIN_SIZE-1))
+			/DEFAULT_UPDATED_WIN_SIZE-1)*DEFAULT_UPDATED_WIN_SIZE;
+			eraseFlashData ( dest_page, DEFAULT_UPDATED_WIN_SIZE );
 			writeFlashData ( dest_page, del->MOVE_DATA_BUFFER, copy_size );
 			left_mark-=copy_size;
 			extended_size-=copy_size;
 		}
 		del->SOURCE_SIZE+=add_size;
 	}
-	if(eraseFlashData ( del->UPDATED_FILE.FileBeginAddr+del->UPDATED_FILE.FileOffset, FLASH_PAGE_SIZE )==0){
+	if(eraseFlashData ( del->UPDATED_FILE.FileBeginAddr+del->UPDATED_FILE.FileOffset, DEFAULT_UPDATED_WIN_SIZE )==0){
 		return D_ERROR;
 	}
     write_data(&del->UPDATED_FILE,del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN);
@@ -665,17 +641,17 @@ void set_win_header(delta *del){
 *****************************************************************************/
 void init_delta(delta *del){
     //delta *Delta=(delta *)malloc(sizeof(delta));
-    if(dfile_open(&del->DELTA_FILE,DEFAULT_DELTA_DATA_POSITION)==D_ERROR){
+    if(dfile_open(&del->DELTA_FILE,DEFAULT_DELTA_DATA_POSITION)==D_ERROR){//设置delta文件
 	//这里要报错
 	}
 	del->DELTA_SIZE=DEBUG_DELTA_SIZE;//...DEBUG_DELTA_SIZE只是用于debug使用的。在接受delta文件时，需要实时计算delta文件的大小，
 	//并以某种方式保存下来，并在这里赋值，
 	//这个很重要，在DECODER的while循环中，要用delta文件的大小来检测是否读到了文件的尾部
-	if(dfile_open(&del->SOURCE_FILE,DEFAULT_SOURCE_DATA_POSITION)==D_ERROR){
+	if(dfile_open(&del->SOURCE_FILE,DEFAULT_SOURCE_DATA_POSITION)==D_ERROR){//设置源文件
 	//这里要报错
 	}
 	//del->SOURCE_SIZE=DEBUG_SOURCE_SIZE;
-	if(dfile_open(&del->UPDATED_FILE,DEFAULT_UPDATED_DATA_POSITION)==D_ERROR){
+	if(dfile_open(&del->UPDATED_FILE,DEFAULT_UPDATED_DATA_POSITION)==D_ERROR){//设置目标文件
 	//这里要报错
 	}
     return;
@@ -691,7 +667,7 @@ void init_delta(delta *del){
  * 调用关系  :
  * 其    它  :
 *****************************************************************************/
-D_RT verify_file(delta *del){
+D_RT verify_file(delta *del){//检验delta文件的magic bytes和版本信息，未来需要加入源文件的MD5和delta文件的MD5的校验
     dfile *delfile=&del->DELTA_FILE;
     if(read_byte(delfile)!=0xd6)return D_ERROR;
     if(read_byte(delfile)!=0xc3)return D_ERROR;
