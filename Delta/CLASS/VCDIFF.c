@@ -31,6 +31,15 @@ D_RT header_packer(FILE *delta,stream *stm){
     write_byte(delta, SOFTWARE_VERSION);
     //if(stm->DECOMPRESS)temp=temp | 0x01;
     //if(stm->CODETABLE)temp=temp | 0x02;
+    write_integer(delta, stm->TARGET->TARGET_FILE->FILE_SIZE);
+    write_integer(delta, stm->SOURCE->SOURCE_FILE->FILE_SIZE);
+    if(stm->ENCODE_MODE==1){
+        temp|=0x04;
+    }else if(stm->ENCODE_MODE==2){
+        temp|=0x08;
+    }else{
+        temp|=0x10;
+    }
     write_byte(delta, temp);//HDR_INDICATOR
     //MARK: 后期在此添加二次压缩和自定义指令表内容
     return D_OK;

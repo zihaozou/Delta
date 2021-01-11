@@ -215,32 +215,7 @@ instruction_node *match_extend(uint8_t issource,uint64_t curr_posi,target_window
 }
 
 
-void stream_match_test(void){
-    FILE *output=fopen("test/delta_file", "wb+");
-    stream *Stream=create_stream();
-    target *Target=create_target();
-    source *Source=create_source();
-    //instruction *Instruction=create_instruction();
-    set_src_file(Source, "test/source_64B");
-    init_window(Source);
-    global_source_hash(Source);
-    set_tgt_file(Target, "test/target_64B");
-    add_target(Stream, Target);
-    add_source(Stream, Source);
-    header_packer(output, Stream);
-    
-    while(set_window(Target)==D_OK){
-        init_encode(Stream);
-        match(Stream);
-        ADD_complement(Stream->TARGET->TARGET_WINDOW->INSTRUCTION, Stream->TARGET->TARGET_WINDOW);
-        window_packer(output, Stream);
-    }
-    fclose(output);
-    delete_inst_list(Target->TARGET_WINDOW->INSTRUCTION);
-    clean_source(Source);
-    clean_target(Target);
-    //TODO: ADD_complement和vcd_packer。完成后添加RUN和small match
-}
+
 
 D_RT rearrange_source_file(stream *stm, uint32_t add_size){
     //这个函数将极大的消耗内存资源，确保内存拥有源文件大小*2的剩余空间
@@ -259,17 +234,22 @@ D_RT rearrange_source_file(stream *stm, uint32_t add_size){
     }
     HASH_CLEAR(hh,src->SOURCE_WINDOW->LRU_MANAGER->IN_POOL_BLOCK_HASH);
     //上面将清理原有的hash table
-    byte *temp=(byte *)malloc(sizeof(byte)*src->SOURCE_FILE->FILE_SIZE*2);
-    fseek(src->SOURCE_FILE->FILE_INSTANCE, 0, SEEK_SET);
-    fread(temp, 1, src->SOURCE_FILE->FILE_SIZE, src->SOURCE_FILE->FILE_INSTANCE);
-    uint64_t start=stm->TARGET->TARGET_WINDOW->START_POSITION;
-    memmove(&temp[start+add_size], &temp[start], src->SOURCE_FILE->FILE_SIZE-start);
-    memcpy(&temp[start], stm->TARGET->TARGET_WINDOW->BUFFER, stm->TARGET->TARGET_WINDOW->BUFFER_SIZE);
-    src->SOURCE_FILE->FILE_SIZE=delta_max(src->SOURCE_FILE->FILE_SIZE+add_size, start+stm->TARGET->TARGET_WINDOW->BUFFER_SIZE);
-    
-    fseek(src->SOURCE_FILE->FILE_INSTANCE, 0, SEEK_SET);
-    fwrite(temp, src->SOURCE_FILE->FILE_SIZE, 1, src->SOURCE_FILE->FILE_INSTANCE);
-    free(temp);
+    if(stm->ENCODE_MODE==3){
+        byte *temp=(byte *)malloc(sizeof(byte)*src->SOURCE_FILE->FILE_SIZE*2);
+        fseek(src->SOURCE_FILE->FILE_INSTANCE, 0, SEEK_SET);
+        fread(temp, 1, src->SOURCE_FILE->FILE_SIZE, src->SOURCE_FILE->FILE_INSTANCE);
+        uint64_t start=stm->TARGET->TARGET_WINDOW->START_POSITION;
+        memmove(&temp[start+add_size], &temp[start], src->SOURCE_FILE->FILE_SIZE-start);
+        memcpy(&temp[start], stm->TARGET->TARGET_WINDOW->BUFFER, stm->TARGET->TARGET_WINDOW->BUFFER_SIZE);
+        src->SOURCE_FILE->FILE_SIZE=delta_max(src->SOURCE_FILE->FILE_SIZE+add_size, start+stm->TARGET->TARGET_WINDOW->BUFFER_SIZE);
+        fseek(src->SOURCE_FILE->FILE_INSTANCE, 0, SEEK_SET);
+        fwrite(temp, src->SOURCE_FILE->FILE_SIZE, 1, src->SOURCE_FILE->FILE_INSTANCE);
+        free(temp);
+    }else{
+        fseek(src->SOURCE_FILE->FILE_INSTANCE, stm->TARGET->TARGET_WINDOW->START_POSITION, SEEK_SET);
+        fwrite(stm->TARGET->TARGET_WINDOW->BUFFER, stm->TARGET->TARGET_WINDOW->BUFFER_SIZE, 1, src->SOURCE_FILE->FILE_INSTANCE);
+        src->SOURCE_FILE->FILE_SIZE=delta_max(src->SOURCE_FILE->FILE_SIZE, stm->TARGET->TARGET_WINDOW->START_POSITION+stm->TARGET->TARGET_WINDOW->BUFFER_SIZE);
+    }
     init_window(src);
     global_source_hash(src);
     return D_OK;

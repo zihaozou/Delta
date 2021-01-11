@@ -21,12 +21,15 @@ typedef struct _decode_block{
     struct _decode_block *NEXT;
 }decode_block;
 typedef struct _delta{
+    int DECODE_MODE;
     FILE *FILE_INSTANCE;
     dsize FILE_SIZE;
     FILE *UPDATED_FILE;
+    dsize UPDATED_SIZE;
     FILE *SOURCE_FILE;
     dsize SOURCE_SIZE;
-    byte UPDATED_BUFFER[DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2];
+    byte *UPDATED_BUFFER;
+    int UPDATED_WIN_SIZE;
     
     dsize SOURCE_WIN_SIZE;
     byte SOURCE_BUFFER[DECODE_SOURCE_SIZE];
@@ -205,33 +208,15 @@ D_RT copy_data(delta *del,dposition decode_posi, dposition addr,dsize siz){
     
     return D_OK;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 void set_HDR(delta *del){
-    fseek(del->FILE_INSTANCE, 4, SEEK_SET);
     del->HDR_INDICATOR=getc(del->FILE_INSTANCE);
+    if(del->HDR_INDICATOR&(1<<2))del->DECODE_MODE=1;
+    else if(del->HDR_INDICATOR&(1<<3))del->DECODE_MODE=2;
+    else del->DECODE_MODE=3;
     return;
 }
 void set_first_win(delta *del){
     //如果要使用二次压缩，那这里就需要修改
-    fseek(del->FILE_INSTANCE, 5, SEEK_SET);
     del->CURRENT_WIN_POSI=ftell(del->FILE_INSTANCE);
     del->NEXT_WIN_POSI=0;
     del->TARGET_POSI=0;
@@ -271,7 +256,7 @@ D_RT decode_window(delta *del){
     if(del->CURRENT_WIN_POSI!=ftell(delfile))return D_ERROR;
     set_win_header(del);
     init_source_lru(del);//初始化lru
-    memset(del->UPDATED_BUFFER, 0, DEFAULT_TARGET_WIN_SIZE+DEFAULT_TARGET_WIN_SIZE/2);
+    memset(del->UPDATED_BUFFER, 0, del->UPDATED_WIN_SIZE);
     dposition curr_decode_position=0;
     //reading delta routine
     dposition inst_posi=del->CURRENT_INST_POSI;
@@ -340,17 +325,23 @@ D_RT decode_window(delta *del){
                 break;
         }
     }
-    byte *temp=(void *)malloc(sizeof(del->SOURCE_SIZE));
-    fseek(del->SOURCE_FILE, 0, SEEK_SET);
-    fread(temp, 1, del->SOURCE_SIZE, del->SOURCE_FILE);
-    memmove(&temp[del->TARGET_POSI+add_size], &temp[del->TARGET_POSI], del->SOURCE_SIZE-del->TARGET_POSI);
-    memcpy(&temp[del->TARGET_POSI], del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN);
-    del->SOURCE_SIZE=delta_max(del->SOURCE_SIZE+add_size, del->TARGET_POSI+del->LENGTH_TARGET_WIN);
-    fseek(del->SOURCE_FILE, 0, SEEK_SET);
-    fwrite(temp, del->SOURCE_SIZE, 1, del->SOURCE_FILE);
-    del->TARGET_POSI+=del->LENGTH_TARGET_WIN;
-    free(temp);
-    
+    if(del->DECODE_MODE==2){
+        fseek(del->SOURCE_FILE, del->TARGET_POSI, SEEK_SET);
+        fwrite(del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN, 1, del->SOURCE_FILE);
+        del->SOURCE_SIZE=delta_max(del->SOURCE_SIZE, del->TARGET_POSI+del->LENGTH_TARGET_WIN);
+        del->TARGET_POSI+=del->LENGTH_TARGET_WIN;
+    }else if(del->DECODE_MODE==3){
+        byte *temp=(void *)malloc(sizeof(del->SOURCE_SIZE));
+        fseek(del->SOURCE_FILE, 0, SEEK_SET);
+        fread(temp, 1, del->SOURCE_SIZE, del->SOURCE_FILE);
+        memmove(&temp[del->TARGET_POSI+add_size], &temp[del->TARGET_POSI], del->SOURCE_SIZE-del->TARGET_POSI);
+        memcpy(&temp[del->TARGET_POSI], del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN);
+        del->SOURCE_SIZE=delta_max(del->SOURCE_SIZE+add_size, del->TARGET_POSI+del->LENGTH_TARGET_WIN);
+        fseek(del->SOURCE_FILE, 0, SEEK_SET);
+        fwrite(temp, del->SOURCE_SIZE, 1, del->SOURCE_FILE);
+        del->TARGET_POSI+=del->LENGTH_TARGET_WIN;
+        free(temp);
+    }
     
     
     fwrite(del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN, 1, del->UPDATED_FILE);
@@ -391,23 +382,41 @@ void test_read_integer(void){
 
 
 
-static delta del;
-void DECODER(const char *delta_name,const char *source_name,const char *updated_name){
+static delta Del;
+void DECODER(const char *delta_name,const char *source_name,const char *updated_name, int page_size){
     //delta *Del=create_delta(delta_name,updated_name,source_name);
-    init_delta(&del, delta_name, updated_name, source_name);
-    if(verify_file(&del)==D_ERROR){
+    FILE *temp;
+    init_delta(&Del, delta_name, updated_name, source_name);
+    Del.UPDATED_WIN_SIZE=page_size;
+    Del.UPDATED_BUFFER=(byte *)malloc(sizeof(byte)*page_size);
+    if(verify_file(&Del)==D_ERROR){
         printf("\nERROR delta file incorrect\n");
         exit(0);
     }
-    set_HDR(&del);
-    set_first_win(&del);
-    while(del.NEXT_WIN_POSI<del.FILE_SIZE){
-        decode_window(&del);
+    Del.UPDATED_SIZE=read_integer(Del.FILE_INSTANCE);
+    if(Del.SOURCE_SIZE!=read_integer(Del.FILE_INSTANCE)){
+        printf("\nERROR different source size\n");
+        exit(0);
     }
-    fclose(del.SOURCE_FILE);
-    fclose(del.FILE_INSTANCE);
-    fclose(del.UPDATED_FILE);
-    
+    set_HDR(&Del);
+    if(Del.DECODE_MODE!=1){
+        temp=fopen("temp.bin", "wb+");
+        byte *tempbuffer=(byte *)malloc(sizeof(byte)*Del.SOURCE_SIZE);
+        fread(tempbuffer, 1, Del.SOURCE_SIZE, Del.SOURCE_FILE);
+        fwrite(tempbuffer, Del.SOURCE_SIZE, 1, temp);
+        fclose(Del.SOURCE_FILE);
+        Del.SOURCE_FILE=temp;
+        rewind(temp);
+        free(tempbuffer);
+    }
+    set_first_win(&Del);
+    while(Del.NEXT_WIN_POSI<Del.FILE_SIZE){
+        decode_window(&Del);
+    }
+    fclose(Del.SOURCE_FILE);
+    fclose(Del.FILE_INSTANCE);
+    fclose(Del.UPDATED_FILE);
+    if(Del.DECODE_MODE!=1)remove("temp.bin");
 }
 
 void init_delta(delta *del,const char *delta_name,const char *updated_name,const char *source_name){
@@ -443,7 +452,7 @@ D_RT verify_file(delta *Del){
     fread(&temp, 1, 1, delfile);
     if(temp!=0xc4)return D_ERROR;
     fread(&temp, 1, 1, delfile);
-    rewind(Del->FILE_INSTANCE);
+    //rewind(Del->FILE_INSTANCE);
     if(temp!=SOFTWARE_VERSION)return D_ERROR;
     return D_OK;
 }

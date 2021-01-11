@@ -14,5 +14,5 @@
 
 
 void test_read_integer(void);
-void DECODER(const char *delta_name,const char *source_name,const char *updated_name);
+void DECODER(const char *delta_name,const char *source_name,const char *updated_name,int page_size);
 #endif /* DECODER_h */
