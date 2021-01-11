@@ -67,6 +67,9 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
     }
     fclose(output);
     delete_inst_list(Target->TARGET_WINDOW->INSTRUCTION);
+    if(mode==3){
+        printf("\nMODE 3: required flash space=%zu\n",Stream->SOURCE->SOURCE_FILE->FILE_SIZE);
+    }
     clean_source(Source);
     if(mode!=1){
         remove("temp.bin");
