@@ -19,11 +19,11 @@ Delta compression for device with limited resource. I designed this software for
 
    Compression rate rank:
 
-   1≈3>2
+   i≈iii>ii
 
    Storage usage:
 
-   1>3>2
+   i>iii>ii
 
 ## USAGE:
 
@@ -39,4 +39,4 @@ DECODE(on pc):
 ./delta -d delta_file_name source_file_name target_window_size(this size should be equal to the page size of the flash in target device)
 ```
 
-To perform decode on SoC device, add the code 
+To perform decode on SoC device, modify the source files under dir "BOARD_CODE"
