@@ -3,7 +3,7 @@ Delta compression for device with limited resource. I designed this software for
 
 ## FEATURES:
 
-1. Adapted for devices with limited resources, such as small memory, limited network bandwidth and small storage unit.
+1. Adapted for devices with limited resources, ones with small memory, limited network bandwidth and small storage unit.
 
    1. static memory usage. the smallest memory usage can be optimised to (flash page size)*2
    2. using greedy algorithm to perform maximum compression rate.
