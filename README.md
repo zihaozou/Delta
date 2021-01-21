@@ -76,6 +76,11 @@ int main(void){
 
 In order to implement a complete functionalities of a software upgrader. Some other features not included in my code, but you need to do it yourself, are: 1, a bootloader program. 2, a IAP program that integrate my decoder functionality. 
 
+## OPEN SOURCE SOFTWARE INCLUDED IN MY CODE
+
+[mattsta/crcspeed: This make CRC be fast. Included implementations: CRC-64-Jones and CRC-16-CCITT (github.com)](https://github.com/mattsta/crcspeed)
+
+[troydhanson/uthash: C macros for hash tables and more (github.com)](https://github.com/troydhanson/uthash)
 ## LICENSE
 
 MIT(https://www.mit.edu/~amini/LICENSE.md)
