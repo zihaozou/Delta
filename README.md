@@ -5,11 +5,11 @@ Delta compression for device with limited resource. I designed this software for
 
 **Inspired** by 
 
-[Xdelta3]: http://xdelta.org/
+Xdelta3(http://xdelta.org/)
 
 and GOOGLE's
 
-[open-vfdiff]: https://github.com/google/open-vcdiff
+open-vfdiff(https://github.com/google/open-vcdiff)
 
 ## FEATURES:
 
@@ -78,5 +78,5 @@ In order to implement a complete functionalities of a software upgrader. Some ot
 
 ## LICENSE
 
-[MIT]: https://www.mit.edu/~amini/LICENSE.md
+MIT(https://www.mit.edu/~amini/LICENSE.md)
 
