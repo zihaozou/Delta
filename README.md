@@ -25,7 +25,7 @@ open-vfdiff(https://github.com/google/open-vcdiff)
 
    1. decode target file in new storage space
    2. decode target file directly upon the storage space of source file.
-   3. decode target file upon the storage space of source file, but source file moves backward to perform better compression rate
+   3. decode target file upon the storage space of source file with a backoff algorithm.
 
    Compression rate rank:
 
@@ -55,7 +55,7 @@ open-vfdiff(https://github.com/google/open-vcdiff)
 
 1, locate to the definition of the macro "DEFAULT_UPDATED_WIN_SIZE" in the file "BOARD_CODE.h".  Here I assign it to "FLASH_PAGE_SIZE", which is a macro defined in stm32 flash driver lib. Replace the value based on the actual page size of the flash in your target device. Next, you need to adjust the macros "DEFAULT_SOURCE_DATA_POSITION", "DEFAULT_DELTA_DATA_POSITION" and "DEFAULT_UPDATED_DATA_POSITION" to the flash location you wish to save your delta file, source file and target file
 
-2, open the file "BOARD_CODE.c"; locate to the function group "文件操作函数(file io function)". Here you need to rewrite these function based on your device library.
+2, open the file "BOARD_CODE.c"; locate to the function group "文件操作函数(file io functions)". Here you need to rewrite these function based on your device library.
 
 3, locate to the function "init_delta". Here you need to assign the real delta file size to the field "del->DELTA_SIZE". I use "DEBUG_DELTA_SIZE" just for debugging.
 
@@ -70,13 +70,13 @@ int main(void){
 }
 ```
 
-6, after executing the program, check your flash space using programmer tool (I use SEGGER flash, but it can be different based on your platform). export the target file (if you use mode 1, the target file will be decoded at the "DEFAULT_UPDATED_DATA_POSITION", else if you use mode 2 or 3, you will find your target file at the location of your original source file).
+6, after executing the program, check your flash space using programmer tool (I use SEGGER flash, but it can be different based on your platform). export the target file (if you use mode 1, the target file will be decoded at the "DEFAULT_UPDATED_DATA_POSITION", else if you use mode 2 or 3, you will find your target file at the location of your original source file). Use file comparison tool to check the result.
 
 **************************************************************
 
 In order to implement a complete functionalities of a software upgrader. Some other features not included in my code, but you need to do it yourself, are: 1, a bootloader program. 2, a IAP program that integrate my decoder functionality. 
 
-## OPEN SOURCE SOFTWARE INCLUDED IN MY CODE
+## OPEN SOURCE SOFTWARE USAGE
 
 [mattsta/crcspeed: This make CRC be fast. Included implementations: CRC-64-Jones and CRC-16-CCITT (github.com)](https://github.com/mattsta/crcspeed)
 
