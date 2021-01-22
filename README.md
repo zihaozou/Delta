@@ -74,7 +74,7 @@ int main(void){
 
 **************************************************************
 
-In order to implement a complete functionalities of a software upgrader. Some other features not included in my code, but you need to do it yourself, are: 1, a bootloader program. 2, a IAP program that integrate my decoder functionality. 
+In order to implement a complete functionalities of a software upgrader. Some other features not included in my code, but you need to do it yourself, are: 1, a bootloader program. 2, a IAP program that integrates my decoder functionality. 
 
 ## OPEN SOURCE SOFTWARE USAGE
 
