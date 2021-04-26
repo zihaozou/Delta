@@ -64,11 +64,11 @@
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "a3_m0/delta.bin"
+            argument = "a3_m0/delta_3.bin"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "-1"
+            argument = "-3"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
