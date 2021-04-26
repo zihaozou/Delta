@@ -1,26 +1,3 @@
-/*
-MIT License
-
-Copyright (c) 2021 ZihaoZou
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
 //
 //  DECODER.h
 //  Delta
@@ -52,6 +29,7 @@ SOFTWARE.
 #define DEFAULT_SOURCE_DATA_POSITION 0x8008000//源文件被存放的起始位置，注意：源文件必须被存放在一个flash page的起始位置
 #define DEFAULT_DELTA_DATA_POSITION 0x8004000//delta文件存放的起始位置
 #define DEFAULT_UPDATED_DATA_POSITION 0x8020000//如果需要将解码出的目标文件放在一个新的地址空间上，则需要在这里定义其位置
+#define DEFAULT_UPDATED_WIN_SIZE FLASH_PAGE_SIZE//在移植到不同芯片上时，需要修改这里的数值为新芯片的flash page大小
 #define DEBUG_DELTA_SIZE 15469//调试用delta文件大小
 #define DEBUG_SOURCE_SIZE 95072//调试用源文件大小
 #define DECODE_SOURCE_SIZE 1024//解码器LRU缓存区大小
@@ -91,8 +69,8 @@ typedef struct _delta{//这个结构体存有解码所需的所有信息，会�
 	dsize SOURCE_SIZE;//源文件大小，这个是必须的，我们的IAP需要某种方式来记录源文件大小，并在init_delta函数中赋值给这个变量
 	
 	byte DECODE_MODE;
-    byte UPDATED_BUFFER[FLASH_PAGE_SIZE];//解码数据缓存区
-    byte MOVE_DATA_BUFFER[FLASH_PAGE_SIZE];//移动flash中源文件数据的缓存区
+    byte UPDATED_BUFFER[DEFAULT_UPDATED_WIN_SIZE];//解码数据缓存区
+    byte MOVE_DATA_BUFFER[DEFAULT_UPDATED_WIN_SIZE];//移动flash中源文件数据的缓存区
     byte SOURCE_BUFFER[DECODE_SOURCE_SIZE];//源文件数据数据                    TODO：这个缓存区可以与MOVE_DATA_BUFFER合并，来减少内存的使用
     decode_block DECODE_BLOCK_LIST[DECODE_BLOCK_NUMBER];//Lru BLOCK列表
     decode_block *CURRENT_BLOCK;//当前解码BLOCK
