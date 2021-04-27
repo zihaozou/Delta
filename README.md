@@ -37,6 +37,16 @@ open-vfdiff(https://github.com/google/open-vcdiff)
 
 ## USAGE:
 
+##### BUILD:
+
+to build the project, you need to install CMake.
+
+in the directory "Delta", create a new folder "build".
+
+in the "build" folder, execute command `cmake ..`
+
+execute command `make`
+
 **ENCODE:**
 
 ```
