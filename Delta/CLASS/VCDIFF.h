@@ -178,6 +178,7 @@ static const int DeltaDefaultCodeTable[6][256] =
 
 D_RT window_packer(FILE *delta,stream *stm);
 D_RT header_packer(FILE *delta,stream *stm);
+void mode3_add_size_packer(FILE *delta,stream *stm,uint32_t add_size);
 D_RT clean_code(code *cod);
 void count_int_len_test(void);
 void vcd_test(void);

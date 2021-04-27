@@ -64,10 +64,14 @@ D_RT header_packer(FILE *delta,stream *stm){
         temp|=0x10;
     }
     write_byte(delta, temp);//HDR_INDICATOR
+    
     //MARK: 后期在此添加二次压缩和自定义指令表内容
     return D_OK;
 }
-
+void mode3_add_size_packer(FILE *delta,stream *stm,uint32_t add_size){
+    write_integer(delta, add_size);
+    return;
+}
 D_RT window_packer(FILE *delta,stream *stm){
     code *cod=create_code(stm);
     code_instruction(stm->TARGET->TARGET_WINDOW->INSTRUCTION, cod);

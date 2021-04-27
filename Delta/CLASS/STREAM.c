@@ -238,8 +238,7 @@ instruction_node *match_extend(uint8_t issource,uint64_t curr_posi,target_window
 }
 
 
-
-
+static uint8_t mode3_bf=0;
 D_RT rearrange_source_file(stream *stm, uint32_t add_size){
     //这个函数将极大的消耗内存资源，确保内存拥有源文件大小*2的剩余空间
     source *src=stm->SOURCE;
@@ -257,17 +256,16 @@ D_RT rearrange_source_file(stream *stm, uint32_t add_size){
     }
     HASH_CLEAR(hh,src->SOURCE_WINDOW->LRU_MANAGER->IN_POOL_BLOCK_HASH);
     //上面将清理原有的hash table
-    if(stm->ENCODE_MODE==3){
-        byte *temp=(byte *)malloc(sizeof(byte)*src->SOURCE_FILE->FILE_SIZE*2);
+    if(stm->ENCODE_MODE==3 && mode3_bf!=1){
+        byte *temp=(byte *)malloc(sizeof(byte)*(src->SOURCE_FILE->FILE_SIZE+stm->TARGET->TARGET_FILE->FILE_SIZE));
+        memset(temp, 0, sizeof(byte)*(src->SOURCE_FILE->FILE_SIZE+stm->TARGET->TARGET_FILE->FILE_SIZE));
         fseek(src->SOURCE_FILE->FILE_INSTANCE, 0, SEEK_SET);
-        fread(temp, 1, src->SOURCE_FILE->FILE_SIZE, src->SOURCE_FILE->FILE_INSTANCE);
-        uint64_t start=stm->TARGET->TARGET_WINDOW->START_POSITION;
-        memmove(&temp[start+add_size], &temp[start], src->SOURCE_FILE->FILE_SIZE-start);
-        memcpy(&temp[start], stm->TARGET->TARGET_WINDOW->BUFFER, stm->TARGET->TARGET_WINDOW->BUFFER_SIZE);
-        src->SOURCE_FILE->FILE_SIZE=delta_max(src->SOURCE_FILE->FILE_SIZE+add_size, start+stm->TARGET->TARGET_WINDOW->BUFFER_SIZE);
+        fread(&temp[add_size], 1, src->SOURCE_FILE->FILE_SIZE, src->SOURCE_FILE->FILE_INSTANCE);
+        src->SOURCE_FILE->FILE_SIZE=src->SOURCE_FILE->FILE_SIZE+add_size;
         fseek(src->SOURCE_FILE->FILE_INSTANCE, 0, SEEK_SET);
         fwrite(temp, src->SOURCE_FILE->FILE_SIZE, 1, src->SOURCE_FILE->FILE_INSTANCE);
         free(temp);
+        mode3_bf=1;
     }else{
         fseek(src->SOURCE_FILE->FILE_INSTANCE, stm->TARGET->TARGET_WINDOW->START_POSITION, SEEK_SET);
         fwrite(stm->TARGET->TARGET_WINDOW->BUFFER, stm->TARGET->TARGET_WINDOW->BUFFER_SIZE, 1, src->SOURCE_FILE->FILE_INSTANCE);

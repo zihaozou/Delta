@@ -348,25 +348,12 @@ D_RT decode_window(delta *del){
                 break;
         }
     }
-    if(del->DECODE_MODE==2){
+    if(del->DECODE_MODE!=1){
         fseek(del->SOURCE_FILE, del->TARGET_POSI, SEEK_SET);
         fwrite(del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN, 1, del->SOURCE_FILE);
         del->SOURCE_SIZE=delta_max(del->SOURCE_SIZE, del->TARGET_POSI+del->LENGTH_TARGET_WIN);
         del->TARGET_POSI+=del->LENGTH_TARGET_WIN;
-    }else if(del->DECODE_MODE==3){
-        byte *temp=(void *)malloc(sizeof(del->SOURCE_SIZE));
-        fseek(del->SOURCE_FILE, 0, SEEK_SET);
-        fread(temp, 1, del->SOURCE_SIZE, del->SOURCE_FILE);
-        memmove(&temp[del->TARGET_POSI+add_size], &temp[del->TARGET_POSI], del->SOURCE_SIZE-del->TARGET_POSI);
-        memcpy(&temp[del->TARGET_POSI], del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN);
-        del->SOURCE_SIZE=delta_max(del->SOURCE_SIZE+add_size, del->TARGET_POSI+del->LENGTH_TARGET_WIN);
-        fseek(del->SOURCE_FILE, 0, SEEK_SET);
-        fwrite(temp, del->SOURCE_SIZE, 1, del->SOURCE_FILE);
-        del->TARGET_POSI+=del->LENGTH_TARGET_WIN;
-        free(temp);
     }
-    
-    
     fwrite(del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN, 1, del->UPDATED_FILE);
     //free(merged_buffer);
     fseek(delfile,del->NEXT_WIN_POSI,SEEK_SET);
@@ -409,6 +396,7 @@ static delta Del;
 void DECODER(const char *delta_name,const char *source_name,const char *updated_name, int page_size){
     //delta *Del=create_delta(delta_name,updated_name,source_name);
     FILE *temp;
+    uint64_t add_size;
     init_delta(&Del, delta_name, updated_name, source_name);
     Del.UPDATED_WIN_SIZE=page_size;
     Del.UPDATED_BUFFER=(byte *)malloc(sizeof(byte)*page_size);
@@ -431,6 +419,20 @@ void DECODER(const char *delta_name,const char *source_name,const char *updated_
         Del.SOURCE_FILE=temp;
         rewind(temp);
         free(tempbuffer);
+    }
+    if(Del.DECODE_MODE==3){
+        add_size=read_integer(Del.FILE_INSTANCE);
+        byte *temp=(void *)malloc(sizeof(byte)*(Del.SOURCE_SIZE+Del.UPDATED_SIZE));
+        memset(temp, 0, sizeof(byte)*(Del.SOURCE_SIZE+Del.UPDATED_SIZE));
+        fseek(Del.SOURCE_FILE, 0, SEEK_SET);
+        fread(&temp[add_size], 1, Del.SOURCE_SIZE, Del.SOURCE_FILE);
+        //memmove(&temp[add_size], &temp[0], Del.SOURCE_SIZE);
+        //memcpy(&temp[0], Del.UPDATED_BUFFER, Del.LENGTH_TARGET_WIN);
+        Del.SOURCE_SIZE=Del.SOURCE_SIZE+add_size;
+        fseek(Del.SOURCE_FILE, 0, SEEK_SET);
+        fwrite(temp, Del.SOURCE_SIZE, 1, Del.SOURCE_FILE);
+        //Del.TARGET_POSI+=Del.LENGTH_TARGET_WIN;
+        free(temp);
     }
     set_first_win(&Del);
     while(Del.NEXT_WIN_POSI<Del.FILE_SIZE){

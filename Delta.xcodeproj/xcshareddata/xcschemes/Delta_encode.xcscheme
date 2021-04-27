@@ -52,27 +52,23 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "-e"
+            argument = "-d"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "a3_m0/old.bin"
+            argument = "delta_3.bin"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "a3_m0/new.bin"
+            argument = "unbm_R1.bin"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "a3_m0/delta_3.bin"
+            argument = "updated.bin"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "-3"
-            isEnabled = "YES">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "2048"
+            argument = "1024"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

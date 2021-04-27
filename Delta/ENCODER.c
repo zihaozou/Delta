@@ -30,26 +30,18 @@ SOFTWARE.
 
 #include "ENCODER.h"
 
-
-
+uint32_t mode3_backoff(stream *Stream);
+void create_alternate_src(source *src);
 void ENCODER(const char *source_name,const char *target_name,const char *delta_name,int mode,int page_size){
     FILE *output=fopen(delta_name, "wb+");
-    uint32_t add_size;
-    FILE *temp;
+    uint32_t add_size=0;
     stream *Stream=create_stream();
     target *Target=create_target(page_size);
     source *Source=create_source();
     Stream->ENCODE_MODE=mode;
     set_src_file(Source, source_name);
     if(mode!=1){
-        temp=fopen("temp.bin", "wb+");
-        byte *tempbuffer=(byte *)malloc(sizeof(byte)*Source->SOURCE_FILE->FILE_SIZE);
-        fread(tempbuffer, 1, Source->SOURCE_FILE->FILE_SIZE, Source->SOURCE_FILE->FILE_INSTANCE);
-        fwrite(tempbuffer, Source->SOURCE_FILE->FILE_SIZE, 1, temp);
-        fclose(Source->SOURCE_FILE->FILE_INSTANCE);
-        Source->SOURCE_FILE->FILE_INSTANCE=temp;
-        rewind(temp);
-        free(tempbuffer);
+        create_alternate_src(Source);
     }
     init_window(Source);
     global_source_hash(Source);
@@ -57,7 +49,10 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
     add_target(Stream, Target);
     add_source(Stream, Source);
     header_packer(output, Stream);
-    
+    if (mode==3){
+        add_size=mode3_backoff(Stream);
+        mode3_add_size_packer(output,Stream,add_size);
+    }
     while(set_window(Target)==D_OK){
         init_encode(Stream);
         match(Stream);
@@ -75,4 +70,29 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
         remove("temp.bin");
     }
     clean_target(Target);
+}
+
+void create_alternate_src(source *src){
+    FILE *temp=fopen("temp.bin", "wb+");
+    byte *tempbuffer=(byte *)malloc(sizeof(byte)*src->SOURCE_FILE->FILE_SIZE);
+    fread(tempbuffer, 1, src->SOURCE_FILE->FILE_SIZE, src->SOURCE_FILE->FILE_INSTANCE);
+    fwrite(tempbuffer, src->SOURCE_FILE->FILE_SIZE, 1, temp);
+    fclose(src->SOURCE_FILE->FILE_INSTANCE);
+    src->SOURCE_FILE->FILE_INSTANCE=temp;
+    rewind(temp);
+    free(tempbuffer);
+}
+
+uint32_t mode3_backoff(stream *Stream){
+    uint32_t total_bf_size=0;
+    while(set_window(Stream->TARGET)==D_OK){
+        init_encode(Stream);
+        match(Stream);
+        total_bf_size+=ADD_complement(Stream->TARGET->TARGET_WINDOW->INSTRUCTION, Stream->TARGET->TARGET_WINDOW);
+    }
+    //delete_inst_list(Stream->TARGET->TARGET_WINDOW->INSTRUCTION);
+    rewind(Stream->TARGET->TARGET_FILE->FILE_INSTANCE);
+    rewind(Stream->SOURCE->SOURCE_FILE->FILE_INSTANCE);
+    rearrange_source_file(Stream,total_bf_size);
+    return total_bf_size;
 }
