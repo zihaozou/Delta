@@ -24,6 +24,7 @@ uint64_t read_integer_at(dfile *f,dposition location);
 void read_bytes_at(dfile *f,dsize s,dposition p,byte *b);
 byte read_byte_at(dfile *f,dposition location);
 uint32_t write_data(dfile *f,byte *buffToSave, uint32_t len);
+uint32_t write_page_at(uint32_t page_addr, byte *page_content, uint32_t len);
 /*地址缓存相关函数*/
 D_RT cache_init(addr_cache *cc);
 D_RT cache_update(addr_cache *cc,uint64_t addr);
@@ -53,6 +54,11 @@ D_RT copy_data(delta *del,dposition decode_posi, dposition addr,dsize siz);
 *****************************************************************************/
 void DECODER(){
     //delta *Del=create_delta(delta_name,updated_name,source_name);
+	dposition dest_page;
+	dsize copy_size;
+	dposition left_mark;
+	dsize extended_size;
+	dsize add_size;
     init_delta(&Del);
     if(verify_file(&Del)==D_ERROR){
         printf("\nERROR delta file incorrect\n");
@@ -60,7 +66,25 @@ void DECODER(){
     }
 	set_file_size(&Del);
     set_HDR(&Del);
-    set_first_win(&Del);
+	if(Del.DECODE_MODE==3){//mode3：将整个源文件后退
+		add_size=read_integer(&Del.DELTA_FILE);
+		left_mark=Del.SOURCE_SIZE;
+		extended_size=Del.SOURCE_SIZE+add_size;
+		while(left_mark-Del.UPDATED_FILE.FileOffset){
+			copy_size=(extended_size%DEFAULT_UPDATED_WIN_SIZE==0)?delta_min(left_mark-Del.UPDATED_FILE.FileOffset,
+			DEFAULT_UPDATED_WIN_SIZE):extended_size%DEFAULT_UPDATED_WIN_SIZE;
+			memset(Del.MOVE_DATA_BUFFER,0,DEFAULT_UPDATED_WIN_SIZE);
+			read_flash_at ( Del.SOURCE_FILE.FileBeginAddr+left_mark-copy_size, Del.MOVE_DATA_BUFFER, copy_size );
+			dest_page=Del.SOURCE_FILE.FileBeginAddr+((extended_size+(DEFAULT_UPDATED_WIN_SIZE-1))
+			/DEFAULT_UPDATED_WIN_SIZE-1)*DEFAULT_UPDATED_WIN_SIZE;
+			erase_page_at ( dest_page, DEFAULT_UPDATED_WIN_SIZE );
+			write_page_at ( dest_page, Del.MOVE_DATA_BUFFER, copy_size );
+			left_mark-=copy_size;
+			extended_size-=copy_size;
+		}
+		Del.SOURCE_SIZE+=add_size;
+	}
+	set_first_win(&Del);
     while(Del.NEXT_WIN_POSI<Del.DELTA_SIZE/*这里使用的delta size必须在init_delta中设置好*/){
         decode_window(&Del);
     }
@@ -97,7 +121,7 @@ D_RT dfile_open(dfile *Open_File,uint32_t Addr){
 *****************************************************************************/
 byte read_byte(dfile *File){
 	byte temp;
-	readFlashData ( File->FileBeginAddr+File->FileOffset, &temp, 1 );
+	read_flash_at ( File->FileBeginAddr+File->FileOffset, &temp, 1 );
 	File->FileOffset++;
     return temp;
 }
@@ -154,7 +178,7 @@ uint64_t read_integer_at(dfile *f,dposition location){
 *****************************************************************************/
 void read_bytes_at(dfile *f,dsize s,dposition p,byte *b){
     f->FileOffset=p;
-    readFlashData ( f->FileBeginAddr+f->FileOffset, b, s );
+    read_flash_at ( f->FileBeginAddr+f->FileOffset, b, s );
 	f->FileOffset+=s;
     return;
 }
@@ -188,7 +212,7 @@ byte read_byte_at(dfile *f,dposition location){
  * 其    它  :
 *****************************************************************************/
 uint32_t write_data(dfile *f,byte *buffToSave, uint32_t len){
-	uint32_t temp=writeFlashData ( f->FileBeginAddr+f->FileOffset, buffToSave,len );
+	uint32_t temp=write_flash_at ( f->FileBeginAddr+f->FileOffset, buffToSave,len );
 	f->FileOffset+=temp;
 	return temp;
 }
@@ -207,23 +231,10 @@ uint32_t write_data(dfile *f,byte *buffToSave, uint32_t len){
  * 其    它  :
 *****************************************************************************/
 uint32_t write_page_at(uint32_t page_addr, byte *page_content, uint32_t len){
-	return writeFlashData(page_addr, page_content,len);
+	return write_flash_at(page_addr, page_content,len);
 }
-/*****************************************************************************
- * 函 数 名  : erase_page_at
- * 负 责 人  : 邹子豪
- * 创建日期  : 2021.4.27
- * 函数功能  : 擦除Flash page数据
- * 输入参数  : uint32_t pageAddress：要擦除页的起始地址
-			   uint32_t len：		  要擦除的数据长度
- * 输出参数  :
- * 返 回 值  : 1，成功；0，失败
- * 调用关系  :
- * 其    它  : 注意：pageAddress必须是要擦除页的起始地址
-*****************************************************************************/
-uint32_t erase_page_at(uint32_t pageAddress, uint32_t len){
-	return eraseFlashData ( pageAddress, len );
-}
+
+
 /*****************************************************************************
  * 函 数 名  : cache_init
  * 负 责 人  : 邹子豪
@@ -470,12 +481,12 @@ void set_HDR(delta *del){
     del->HDR_INDICATOR=read_byte(&del->DELTA_FILE);
 	if(del->HDR_INDICATOR&(1<<2))del->DECODE_MODE=1;
 	else if(del->HDR_INDICATOR&(1<<3)){//如果读到的模式为2和3，则设置目标文件的地址为源文件的地址，以达到直接覆盖源文件的功能
-		del->DECODE_MODE=1;
-		del->UPDATED_FILE.FileBeginAddr=DEFAULT_SOURCE_DATA_POSITION;
+		del->DECODE_MODE=2;
+		del->UPDATED_FILE.FileBeginAddr=GET_SOURCE_POSITION();
 	}
 	else {
 		del->DECODE_MODE=3;
-		del->UPDATED_FILE.FileBeginAddr=DEFAULT_SOURCE_DATA_POSITION;
+		del->UPDATED_FILE.FileBeginAddr=GET_SOURCE_POSITION();
 	}
 	
     return;
@@ -543,10 +554,7 @@ D_RT decode_window(delta *del){
     int m;
     dposition addr;
     dsize size;
-	dposition dest_page;
-	dsize copy_size;
-	dposition left_mark;
-	dsize extended_size;
+	
     while(inst_posi<del->CURRENT_ADDR_POSI){//
         instcode=read_byte_at(delfile, inst_posi);
         inst_posi++;
@@ -592,7 +600,7 @@ D_RT decode_window(delta *del){
                 read_bytes_at(delfile, size, data_posi, &del->UPDATED_BUFFER[curr_decode_position]);
                 data_posi=delfile->FileOffset;
                 curr_decode_position+=size;
-				add_size+=size;
+				//add_size+=size;
                 break;
             case RUN:
                 //设置size
@@ -606,29 +614,12 @@ D_RT decode_window(delta *del){
                 break;
         }
     }
-	if(del->DECODE_MODE==3){//mode3：将整个源文件后退
-		left_mark=del->SOURCE_SIZE;
-		extended_size=del->SOURCE_SIZE+add_size;
-		while(left_mark-del->UPDATED_FILE.FileOffset){
-			copy_size=(extended_size%DEFAULT_UPDATED_WIN_SIZE==0)?delta_min(left_mark-del->UPDATED_FILE.FileOffset,
-			DEFAULT_UPDATED_WIN_SIZE):extended_size%DEFAULT_UPDATED_WIN_SIZE;
-			memset(del->MOVE_DATA_BUFFER,0,DEFAULT_UPDATED_WIN_SIZE);
-			readFlashData ( del->SOURCE_FILE.FileBeginAddr+left_mark-copy_size, del->MOVE_DATA_BUFFER, copy_size );
-			dest_page=del->SOURCE_FILE.FileBeginAddr+((extended_size+(DEFAULT_UPDATED_WIN_SIZE-1))
-			/DEFAULT_UPDATED_WIN_SIZE-1)*DEFAULT_UPDATED_WIN_SIZE;
-			eraseFlashData ( dest_page, DEFAULT_UPDATED_WIN_SIZE );
-			writeFlashData ( dest_page, del->MOVE_DATA_BUFFER, copy_size );
-			left_mark-=copy_size;
-			extended_size-=copy_size;
-		}
-		del->SOURCE_SIZE+=add_size;
-	}
-	if(eraseFlashData ( del->UPDATED_FILE.FileBeginAddr+del->UPDATED_FILE.FileOffset, DEFAULT_UPDATED_WIN_SIZE )==0){
+	
+	if(erase_page_at ( del->UPDATED_FILE.FileBeginAddr+del->UPDATED_FILE.FileOffset, DEFAULT_UPDATED_WIN_SIZE )==0){
 		return D_ERROR;
 	}
     write_data(&del->UPDATED_FILE,del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN);
-    //free(merged_buffer);
-    //fseek(delfile,del->NEXT_WIN_POSI,SEEK_SET);
+
 	delfile->FileOffset=del->NEXT_WIN_POSI;
     del->CURRENT_WIN_POSI=del->NEXT_WIN_POSI;
     return D_OK;
@@ -673,17 +664,17 @@ void set_win_header(delta *del){
 *****************************************************************************/
 void init_delta(delta *del){
     //delta *Delta=(delta *)malloc(sizeof(delta));
-    if(dfile_open(&del->DELTA_FILE,DEFAULT_DELTA_DATA_POSITION)==D_ERROR){//设置delta文件
+    if(dfile_open(&del->DELTA_FILE,GET_DELTA_POSITION())==D_ERROR){//设置delta文件
 	//这里要报错
 	}
-	del->DELTA_SIZE=DEBUG_DELTA_SIZE;//...DEBUG_DELTA_SIZE只是用于debug使用的。在接受delta文件时，需要实时计算delta文件的大小，
+	del->DELTA_SIZE=GET_DELTA_SIZE();//...DEBUG_DELTA_SIZE只是用于debug使用的。在接受delta文件时，需要实时计算delta文件的大小，
 	//并以某种方式保存下来，并在这里赋值，
 	//这个很重要，在DECODER的while循环中，要用delta文件的大小来检测是否读到了文件的尾部
-	if(dfile_open(&del->SOURCE_FILE,DEFAULT_SOURCE_DATA_POSITION)==D_ERROR){//设置源文件
+	if(dfile_open(&del->SOURCE_FILE,GET_SOURCE_POSITION())==D_ERROR){//设置源文件
 	//这里要报错
 	}
 	//del->SOURCE_SIZE=DEBUG_SOURCE_SIZE;
-	if(dfile_open(&del->UPDATED_FILE,DEFAULT_UPDATED_DATA_POSITION)==D_ERROR){//设置目标文件
+	if(dfile_open(&del->UPDATED_FILE,GET_UPDATED_POSITION())==D_ERROR){//设置目标文件
 	//这里要报错
 	}
     return;

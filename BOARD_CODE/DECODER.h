@@ -11,7 +11,79 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+
+
+
+/*BOARD_ORIENTED FUNCTIONS, VARIABLE AND MACRO*/
+/*以下内容为板基函数,变量以及宏定义.在移植的过程中,只需重新定义以下内容*/
 #include "flash.h"
+#define DEFAULT_UPDATED_WIN_SIZE FLASH_PAGE_SIZE//在移植到不同芯片上时，需要修改这里的数值为新芯片的flash page大小
+#define DEFAULT_SOURCE_DATA_POSITION 0x8008000//源文件被存放的起始位置，注意：源文件必须被存放在一个flash page的起始位置
+#define DEFAULT_DELTA_DATA_POSITION 0x8004000//delta文件存放的起始位置
+#define DEFAULT_UPDATED_DATA_POSITION 0x8020000//如果需要将解码出的目标文件放在一个新的地址空间上，则需要在这里定义其位置
+#define DEBUG_DELTA_SIZE 15469//调试用delta文件大小
+#define DEBUG_SOURCE_SIZE 95072//调试用源文件大小
+
+#define GET_SOURCE_POSITION() 			DEFAULT_SOURCE_DATA_POSITION
+#define GET_DELTA_POSITION() 			DEFAULT_DELTA_DATA_POSITION
+#define GET_UPDATED_POSITION() 			DEFAULT_UPDATED_DATA_POSITION
+#define GET_DELTA_SIZE() 				DEBUG_DELTA_SIZE
+#define GET_SOURCE_SIZE()				DEBUG_SOURCE_SIZE
+/*****************************************************************************
+ * 函 数 名  : erase_page_at
+ * 负 责 人  : 邹子豪
+ * 创建日期  : 2021.4.27
+ * 函数功能  : 擦除Flash page数据
+ * 输入参数  : uint32_t pageAddress：要擦除页的起始地址
+			   uint32_t len：		  要擦除的数据长度
+ * 输出参数  :
+ * 返 回 值  : 1，成功；0，失败
+ * 调用关系  :
+ * 其    它  : 注意：pageAddress必须是要擦除页的起始地址
+*****************************************************************************/
+static uint32_t erase_page_at(uint32_t pageAddress, uint32_t len){
+	return eraseFlashData ( pageAddress, len );
+}
+/*****************************************************************************
+ * 函 数 名  : write_flash_at
+ * 负 责 人  : 邹子豪
+ * 创建日期  : 2021.4.27
+ * 函数功能  : 读取flash数据
+ * 输入参数  : uint32_t addr：要写的地址
+								byte *buff:要写的缓冲区
+								uint32_t len：		  要写的数据长度
+ * 输出参数  :
+ * 返 回 值  : 写入的数据大小，为0则写入失败
+ * 调用关系  :
+ * 其    它  : 
+*****************************************************************************/
+static uint32_t write_flash_at(uint32_t addr, uint8_t *buff, uint32_t len){
+	return writeFlashData ( addr,  buff, len );
+}
+
+/*****************************************************************************
+ * 函 数 名  : read_flash_at
+ * 负 责 人  : 邹子豪
+ * 创建日期  : 2021.4.27
+ * 函数功能  : 读取flash数据
+ * 输入参数  : uint32_t addr：要读的地址
+								byte *buff:要读的缓冲区
+								uint32_t len：		  要读的数据长度
+ * 输出参数  :
+ * 返 回 值  : 读取的数据大小，为0则写入失败
+ * 调用关系  :
+ * 其    它  : 
+*****************************************************************************/
+static uint32_t read_flash_at(uint32_t addr, uint8_t *buff, uint32_t len){
+	return readFlashData ( addr, buff, len );
+}
+
+/*BOARD_ORIENTED FUNCTIONS, VARIABLE AND MACRO*/
+
+
+
+
 #define SOFTWARE_VERSION 0x01//软件版本，在收到的delta文件中，也有记录一个版本信息，只有当两个版本符合的话，才可以进行匹配。
 //#include "utlist.h"
 #define delta_min(a,b)      ((a)<(b))?(a):(b)//最小值比较
@@ -26,12 +98,7 @@
 #endif
 #define VCD_SELF 0//SELF寻址模式
 #define VCD_HERE 1//HERE寻址模式
-#define DEFAULT_SOURCE_DATA_POSITION 0x8008000//源文件被存放的起始位置，注意：源文件必须被存放在一个flash page的起始位置
-#define DEFAULT_DELTA_DATA_POSITION 0x8004000//delta文件存放的起始位置
-#define DEFAULT_UPDATED_DATA_POSITION 0x8020000//如果需要将解码出的目标文件放在一个新的地址空间上，则需要在这里定义其位置
-#define DEFAULT_UPDATED_WIN_SIZE FLASH_PAGE_SIZE//在移植到不同芯片上时，需要修改这里的数值为新芯片的flash page大小
-#define DEBUG_DELTA_SIZE 15469//调试用delta文件大小
-#define DEBUG_SOURCE_SIZE 95072//调试用源文件大小
+
 #define DECODE_SOURCE_SIZE 1024//解码器LRU缓存区大小
 #define DECODE_BLOCK_NUMBER 4//LRU的BLOCK数量，单个BLOCK缓存区大小为DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER
 typedef uint32_t dsize;//大小变量类型
