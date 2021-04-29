@@ -17,19 +17,23 @@
 
 /*BOARD_ORIENTED FUNCTIONS, VARIABLE AND MACRO*/
 /*以下内容为板基函数,变量以及宏定义.在移植的过程中,只需重新定义以下内容*/
-#include "flash.h"
-#define DEFAULT_UPDATED_WIN_SIZE FLASH_PAGE_SIZE//在移植到不同芯片上时，需要修改这里的数值为新芯片的flash page大小
-#define DEFAULT_SOURCE_DATA_POSITION 0x8008000//源文件被存放的起始位置，注意：源文件必须被存放在一个flash page的起始位置
+/*FOR DEBUG ONLY*/
+#define DEFAULT_SOURCE_DATA_POSITION 0x8009000//源文件被存放的起始位置，注意：源文件必须被存放在一个flash page的起始位置
 #define DEFAULT_DELTA_DATA_POSITION 0x8004000//delta文件存放的起始位置
 #define DEFAULT_UPDATED_DATA_POSITION 0x8020000//如果需要将解码出的目标文件放在一个新的地址空间上，则需要在这里定义其位置
-#define DEBUG_DELTA_SIZE 15469//调试用delta文件大小
-#define DEBUG_SOURCE_SIZE 95072//调试用源文件大小
-
+#define DEBUG_DELTA_SIZE 19525//调试用delta文件大小
+#define DEBUG_SOURCE_SIZE 120848//调试用源文件大小
+/*FOR DEBUG ONLY*/
+#include "flash.h"
+#include "md5.h"
+#define DEFAULT_UPDATED_WIN_SIZE 512//在移植到不同芯片上时，需要修改这里的数值为新芯片的flash page大小
 #define GET_SOURCE_POSITION() 			DEFAULT_SOURCE_DATA_POSITION
 #define GET_DELTA_POSITION() 			DEFAULT_DELTA_DATA_POSITION
 #define GET_UPDATED_POSITION() 			DEFAULT_UPDATED_DATA_POSITION
 #define GET_DELTA_SIZE() 				DEBUG_DELTA_SIZE
 #define GET_SOURCE_SIZE()				DEBUG_SOURCE_SIZE
+#define FLASH_ADDR_BASE					FLASH_BASE_ADDR
+#define FLASH_SIZE						FLASH_MAX_SIZE
 /*****************************************************************************
  * 函 数 名  : erase_page_at
  * 负 责 人  : 邹子豪
@@ -78,6 +82,28 @@ static uint32_t write_flash_at(uint32_t addr, uint8_t *buff, uint32_t len){
 static uint32_t read_flash_at(uint32_t addr, uint8_t *buff, uint32_t len){
 	return readFlashData ( addr, buff, len );
 }
+/*****************************************************************************
+ * 函 数 名  : board_oriented_finalizer
+ * 负 责 人  : 邹子豪
+ * 创建日期  : 2021.4.29
+ * 函数功能  : 	自定义函数处理结束升级后的收尾工作,例如将升级后的文件大小和地址以某种方式保存,以供下次使用
+				注意delta文件在此时任然存在于flash空间中的,需要手动清理.
+* 输入参数  : 	uint32_t delta_addr: delta文件地址
+				uint32_t delta_size: delta文件大小
+				uint32_t updated_addr: 升级后文件地址
+				uint32_t updated_size: 升级后文件大小
+ * 输出参数  :
+ * 返 回 值  : 
+ * 调用关系  :
+ * 其    它  : 
+*****************************************************************************/
+static void board_oriented_finalizer(uint32_t delta_addr,
+			uint32_t delta_size,
+			uint32_t updated_addr,
+			uint32_t updated_size
+			){
+	__NOP;
+}
 
 /*BOARD_ORIENTED FUNCTIONS, VARIABLE AND MACRO*/
 
@@ -99,7 +125,7 @@ static uint32_t read_flash_at(uint32_t addr, uint8_t *buff, uint32_t len){
 #define VCD_SELF 0//SELF寻址模式
 #define VCD_HERE 1//HERE寻址模式
 
-#define DECODE_SOURCE_SIZE 1024//解码器LRU缓存区大小
+#define DECODE_SOURCE_SIZE DEFAULT_UPDATED_WIN_SIZE//解码器LRU缓存区大小
 #define DECODE_BLOCK_NUMBER 4//LRU的BLOCK数量，单个BLOCK缓存区大小为DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER
 typedef uint32_t dsize;//大小变量类型
 typedef uint32_t dposition;//位置变量类型
@@ -138,7 +164,6 @@ typedef struct _delta{//这个结构体存有解码所需的所有信息，会�
 	byte DECODE_MODE;
     byte UPDATED_BUFFER[DEFAULT_UPDATED_WIN_SIZE];//解码数据缓存区
     byte MOVE_DATA_BUFFER[DEFAULT_UPDATED_WIN_SIZE];//移动flash中源文件数据的缓存区
-    byte SOURCE_BUFFER[DECODE_SOURCE_SIZE];//源文件数据数据                    TODO：这个缓存区可以与MOVE_DATA_BUFFER合并，来减少内存的使用
     decode_block DECODE_BLOCK_LIST[DECODE_BLOCK_NUMBER];//Lru BLOCK列表
     decode_block *CURRENT_BLOCK;//当前解码BLOCK
     decode_block *HEAD;
@@ -313,5 +338,5 @@ static const uint8_t DeltaDefaultCodeTable[6][256] =
         7, 7, 7, 7,  // opcodes 239-242
         8, 8, 8, 8,  // opcodes 243-246
         0, 0, 0, 0, 0, 0, 0, 0, 0 } };  // opcodes 247-255
-void DECODER(void);
+D_RT DECODER(void);
 #endif /* DECODER_h */

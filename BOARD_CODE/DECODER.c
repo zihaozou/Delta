@@ -15,7 +15,7 @@ D_RT verify_file(delta *del);
 D_RT decode_window(delta *del);
 void set_first_win(delta *del);
 void set_HDR(delta *del);
-D_RT set_file_size(delta *del);
+D_RT finalizer(delta *del);
 /*文件操作函数*/
 D_RT dfile_open(dfile *Open_File,uint32_t Addr);
 byte read_byte(dfile *File);
@@ -42,7 +42,8 @@ D_RT copy_data(delta *del,dposition decode_posi, dposition addr,dsize siz);
  * 函数功能  : 开始解码流程
  * 输入参数  : 无
  * 输出参数  : 无
- * 返 回 值  : 无
+ * 返 回 值  : D_OK: 解码成功
+				D_ERROR：解码失败
  * 调用关系  :
  * 其    它  :
 	解码主要流程：
@@ -52,19 +53,17 @@ D_RT copy_data(delta *del,dposition decode_posi, dposition addr,dsize siz);
 	4，设置第一个目标窗口的起始位置
 	5，启动窗口解码，此处进入一个循环，一直解码下一窗口，直到读到delta文件末尾
 *****************************************************************************/
-void DECODER(){
+D_RT DECODER(){
     //delta *Del=create_delta(delta_name,updated_name,source_name);
+	uint32_t x;
 	dposition dest_page;
 	dsize copy_size;
 	dposition left_mark;
 	dsize extended_size;
 	dsize add_size;
     init_delta(&Del);
-    if(verify_file(&Del)==D_ERROR){
-        printf("\nERROR delta file incorrect\n");
-        return;
-    }
-	set_file_size(&Del);
+    if(verify_file(&Del)==D_ERROR)return D_ERROR;
+    
     set_HDR(&Del);
 	if(Del.DECODE_MODE==3){//mode3：将整个源文件后退
 		add_size=read_integer(&Del.DELTA_FILE);
@@ -74,20 +73,28 @@ void DECODER(){
 			copy_size=(extended_size%DEFAULT_UPDATED_WIN_SIZE==0)?delta_min(left_mark-Del.UPDATED_FILE.FileOffset,
 			DEFAULT_UPDATED_WIN_SIZE):extended_size%DEFAULT_UPDATED_WIN_SIZE;
 			memset(Del.MOVE_DATA_BUFFER,0,DEFAULT_UPDATED_WIN_SIZE);
-			read_flash_at ( Del.SOURCE_FILE.FileBeginAddr+left_mark-copy_size, Del.MOVE_DATA_BUFFER, copy_size );
+			read_flash_at ( Del.SOURCE_FILE.FileBeginAddr+left_mark-copy_size, 
+			&Del.MOVE_DATA_BUFFER[(left_mark==copy_size)?DEFAULT_UPDATED_WIN_SIZE-copy_size:0], copy_size );
 			dest_page=Del.SOURCE_FILE.FileBeginAddr+((extended_size+(DEFAULT_UPDATED_WIN_SIZE-1))
 			/DEFAULT_UPDATED_WIN_SIZE-1)*DEFAULT_UPDATED_WIN_SIZE;
 			erase_page_at ( dest_page, DEFAULT_UPDATED_WIN_SIZE );
-			write_page_at ( dest_page, Del.MOVE_DATA_BUFFER, copy_size );
+			write_page_at ( dest_page, Del.MOVE_DATA_BUFFER, (left_mark==copy_size)?DEFAULT_UPDATED_WIN_SIZE:copy_size );
 			left_mark-=copy_size;
 			extended_size-=copy_size;
+		}
+		memset(Del.MOVE_DATA_BUFFER,0,DEFAULT_UPDATED_WIN_SIZE);
+		for(x=Del.SOURCE_FILE.FileBeginAddr;x<dest_page;x+=DEFAULT_UPDATED_WIN_SIZE){
+			erase_page_at ( x, DEFAULT_UPDATED_WIN_SIZE );
+			write_page_at(x,Del.MOVE_DATA_BUFFER,DEFAULT_UPDATED_WIN_SIZE);
 		}
 		Del.SOURCE_SIZE+=add_size;
 	}
 	set_first_win(&Del);
     while(Del.NEXT_WIN_POSI<Del.DELTA_SIZE/*这里使用的delta size必须在init_delta中设置好*/){
-        decode_window(&Del);
+        if(decode_window(&Del)==D_ERROR)return D_ERROR;
     }
+	finalizer(&Del);
+	return D_OK;
 }
 /*****************************************************************************
  * 函 数 名  : dfile_open
@@ -103,7 +110,7 @@ void DECODER(){
  * 其    它  :
 *****************************************************************************/
 D_RT dfile_open(dfile *Open_File,uint32_t Addr){
-	if(Addr<FLASH_BASE_ADDR ||Addr>FLASH_BASE_ADDR+FLASH_MAX_SIZE)return D_ERROR;
+	if(Addr<FLASH_ADDR_BASE ||Addr>FLASH_ADDR_BASE+FLASH_SIZE)return D_ERROR;
 	Open_File->FileBeginAddr=Addr;
 	Open_File->FileOffset=0;
 	return D_OK;
@@ -285,19 +292,19 @@ D_RT cache_update(addr_cache *cc,uint64_t addr){
 D_RT init_source_lru(delta *del){
     if(del->SOURCE_SEGMENT_LENGTH<=DECODE_SOURCE_SIZE){
         //del->SOURCE_FILE.FileOffset=del->SOURCE_SEGMENT_POSITION;
-		read_bytes_at(&del->SOURCE_FILE,del->SOURCE_SEGMENT_LENGTH,del->SOURCE_SEGMENT_POSITION,del->SOURCE_BUFFER);
+		read_bytes_at(&del->SOURCE_FILE,del->SOURCE_SEGMENT_LENGTH,del->SOURCE_SEGMENT_POSITION,del->MOVE_DATA_BUFFER);
         del->BLOCK_COUNT=1;
         del->BLOCK_INPOOL=1;
         del->HEAD=&del->DECODE_BLOCK_LIST[0];
         del->TAIL=&del->DECODE_BLOCK_LIST[0];
         del->DECODE_BLOCK_LIST[0].BLOCK_NUMBER=0;
-        del->DECODE_BLOCK_LIST[0].DATA=del->SOURCE_BUFFER;
+        del->DECODE_BLOCK_LIST[0].DATA=del->MOVE_DATA_BUFFER;
         del->DECODE_BLOCK_LIST[0].DATA_SIZE=del->SOURCE_SEGMENT_LENGTH;
         del->DECODE_BLOCK_LIST[0].NEXT=NULL;
         del->DECODE_BLOCK_LIST[0].PREV=NULL;
         //del->SOURCE_WIN_SIZE=del->SOURCE_SEGMENT_LENGTH;
     }else{
-        read_bytes_at(&del->SOURCE_FILE,DECODE_SOURCE_SIZE,del->SOURCE_SEGMENT_POSITION,del->SOURCE_BUFFER);
+        read_bytes_at(&del->SOURCE_FILE,DECODE_SOURCE_SIZE,del->SOURCE_SEGMENT_POSITION,del->MOVE_DATA_BUFFER);
         uint64_t init_block_size=DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER;
         //a = (b + (c - 1)) / c
         del->BLOCK_COUNT=(uint32_t)(del->SOURCE_SEGMENT_LENGTH+(init_block_size-1))/init_block_size;
@@ -306,7 +313,7 @@ D_RT init_source_lru(delta *del){
         del->TAIL=&del->DECODE_BLOCK_LIST[DECODE_BLOCK_NUMBER-1];
         for(int x=0;x<DECODE_BLOCK_NUMBER;x++){//设置每个block
             del->DECODE_BLOCK_LIST[x].BLOCK_NUMBER=x;
-            del->DECODE_BLOCK_LIST[x].DATA=&del->SOURCE_BUFFER[x*init_block_size];
+            del->DECODE_BLOCK_LIST[x].DATA=&del->MOVE_DATA_BUFFER[x*init_block_size];
             del->DECODE_BLOCK_LIST[x].DATA_SIZE=init_block_size;
             if(x==0){
                 del->DECODE_BLOCK_LIST[x].PREV=NULL;
@@ -509,24 +516,6 @@ void set_first_win(delta *del){
     return;
 }
 /*****************************************************************************
- * 函 数 名  : set_file_size
- * 负 责 人  : 邹子豪
- * 创建日期  : 2021.1.10
-* 函数功能  : 从delta文件中读取数据并设置各个文件的大小，如果从delta文件中读到的源文件大小与设备记录的源文件大小不同的话，则会返回错误，并终止升级
- * 输入参数  : delta *del: dalta结构体实例
- * 输出参数  : 无
- * 返 回 值  : D_OK成功，D_ERROR失败
- * 调用关系  :
- * 其    它  :
-*****************************************************************************/
-D_RT set_file_size(delta *del){//设置源文件和目标文件大小
-	del->UPDATED_SIZE=read_integer(&del->DELTA_FILE);
-	del->SOURCE_SIZE=read_integer(&del->DELTA_FILE);
-	//TODO: 这里需要与设备之前记录的源文件大小作比较，如果不一样则返回错误
-	//if.......
-	return D_OK;
-}
-/*****************************************************************************
  * 函 数 名  : decode_window
  * 负 责 人  : 邹子豪
  * 创建日期  : 2021.1.9
@@ -538,7 +527,6 @@ D_RT set_file_size(delta *del){//设置源文件和目标文件大小
  * 其    它  :
 *****************************************************************************/
 D_RT decode_window(delta *del){
-    dsize add_size=0;//用于记录一个窗口内add指令的size和
     memset(&cache,0,sizeof(cache));//初始化地址缓存
     dfile *delfile=&del->DELTA_FILE;
     if(del->CURRENT_WIN_POSI!=delfile->FileOffset)return D_ERROR;
@@ -663,21 +651,9 @@ void set_win_header(delta *del){
  * 其    它  :
 *****************************************************************************/
 void init_delta(delta *del){
-    //delta *Delta=(delta *)malloc(sizeof(delta));
-    if(dfile_open(&del->DELTA_FILE,GET_DELTA_POSITION())==D_ERROR){//设置delta文件
-	//这里要报错
-	}
-	del->DELTA_SIZE=GET_DELTA_SIZE();//...DEBUG_DELTA_SIZE只是用于debug使用的。在接受delta文件时，需要实时计算delta文件的大小，
-	//并以某种方式保存下来，并在这里赋值，
-	//这个很重要，在DECODER的while循环中，要用delta文件的大小来检测是否读到了文件的尾部
-	if(dfile_open(&del->SOURCE_FILE,GET_SOURCE_POSITION())==D_ERROR){//设置源文件
-	//这里要报错
-	}
-	//del->SOURCE_SIZE=DEBUG_SOURCE_SIZE;
-	if(dfile_open(&del->UPDATED_FILE,GET_UPDATED_POSITION())==D_ERROR){//设置目标文件
-	//这里要报错
-	}
-    return;
+	dfile_open(&del->DELTA_FILE,GET_DELTA_POSITION());
+	dfile_open(&del->SOURCE_FILE,GET_SOURCE_POSITION());
+	dfile_open(&del->UPDATED_FILE,GET_UPDATED_POSITION());
 }
 /*****************************************************************************
  * 函 数 名  : verify_file
@@ -691,10 +667,88 @@ void init_delta(delta *del){
  * 其    它  :
 *****************************************************************************/
 D_RT verify_file(delta *del){//检验delta文件的magic bytes和版本信息，未来需要加入源文件的MD5和delta文件的MD5的校验
+	uint8_t x;
+	uint32_t read_size;
     dfile *delfile=&del->DELTA_FILE;
+	byte md5_from_delta[16];
+	byte md5_calculated[16];
+	//检测源文件md5,delta文件md5
+	MD5_CTX md5_checker;
+	MD5Init(&md5_checker);
+	uint32_t file_size;
+	uint32_t file_posi=GET_DELTA_POSITION()+18;
+	uint32_t calculated=0;
+	for (x=0;x<16;x++){
+		md5_from_delta[x]=read_byte(delfile);
+	}
+	file_size=(read_byte(delfile)<<8)|read_byte(delfile);
+	while(calculated<file_size){
+		read_size=delta_min(file_size,DEFAULT_UPDATED_WIN_SIZE);
+		read_flash_at(calculated+file_posi,del->MOVE_DATA_BUFFER,read_size);
+		MD5Update(&md5_checker,del->MOVE_DATA_BUFFER,read_size);
+		calculated+=read_size;
+	}
+	MD5Final(md5_calculated, &md5_checker);
+	for(x=0;x<16;x++){
+		if(md5_calculated[x]!=md5_from_delta[x]){
+			return D_ERROR;
+		}
+	}
+	del->DELTA_SIZE=file_size;
+	for (x=0;x<16;x++){
+		md5_from_delta[x]=read_byte(delfile);
+	}
+	file_size=read_integer(delfile);
+	file_posi=GET_SOURCE_POSITION();
+	MD5Init(&md5_checker);
+	calculated=0;
+	while(calculated<file_size){
+		read_size=delta_min(file_size,DEFAULT_UPDATED_WIN_SIZE);
+		read_flash_at(calculated+file_posi,del->MOVE_DATA_BUFFER,read_size);
+		MD5Update(&md5_checker,del->MOVE_DATA_BUFFER,read_size);
+		calculated+=read_size;
+	}
+	MD5Final(md5_calculated, &md5_checker);
+	for(x=0;x<16;x++){
+		if(md5_calculated[x]!=md5_from_delta[x]){
+			return D_ERROR;
+		}
+	}
+	del->SOURCE_SIZE=file_size;
     if(read_byte(delfile)!=0xd6)return D_ERROR;
     if(read_byte(delfile)!=0xc3)return D_ERROR;
     if(read_byte(delfile)!=0xc4)return D_ERROR;
     if(read_byte(delfile)!=SOFTWARE_VERSION)return D_ERROR;
+	del->UPDATED_SIZE=read_integer(&del->DELTA_FILE);
     return D_OK;
+}
+/*****************************************************************************
+ * 函 数 名  : finalizer
+ * 负 责 人  : 邹子豪
+ * 创建日期  : 2021.1.9
+ * 函数功能  : 解码完成后的收尾工作
+ * 输入参数  : delta *del：delta结构体实例
+ * 输出参数  : 无
+ * 返 回 值  : D_OK成功，D_ERROR失败
+ * 调用关系  :
+ * 其    它  :
+*****************************************************************************/
+D_RT finalizer(delta *del){
+	uint32_t page;
+	uint32_t begin_page=del->UPDATED_FILE.FileBeginAddr+
+		((del->UPDATED_SIZE+(DEFAULT_UPDATED_WIN_SIZE-1))
+		/DEFAULT_UPDATED_WIN_SIZE-1)*DEFAULT_UPDATED_WIN_SIZE+DEFAULT_UPDATED_WIN_SIZE;
+	uint32_t end_page=del->SOURCE_FILE.FileBeginAddr+
+		((del->SOURCE_SIZE+(DEFAULT_UPDATED_WIN_SIZE-1))
+		/DEFAULT_UPDATED_WIN_SIZE-1)*DEFAULT_UPDATED_WIN_SIZE;
+	for(page=begin_page;
+		page<=end_page;
+		page+=DEFAULT_UPDATED_WIN_SIZE){
+		erase_page_at(page,DEFAULT_UPDATED_WIN_SIZE);
+	}
+	board_oriented_finalizer(del->DELTA_FILE.FileBeginAddr,
+	del->DELTA_SIZE,
+	del->UPDATED_FILE.FileBeginAddr,
+	del->UPDATED_SIZE);
+	return D_OK;
 }
