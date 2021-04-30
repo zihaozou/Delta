@@ -724,6 +724,8 @@ D_RT verify_file(delta *del){//检验delta文件的magic bytes和版本信息，
 		read_size=delta_min(file_size-calculated,DEFAULT_UPDATED_WIN_SIZE);
 		read_flash_at(calculated+file_posi,del->MOVE_DATA_BUFFER,read_size);
 		MD5Update(&md5_checker,del->MOVE_DATA_BUFFER,read_size);
+		//MD5Final(md5_calculated, &md5_checker);
+		//__NOP;
 		calculated+=read_size;
 	}
 	MD5Final(md5_calculated, &md5_checker);
@@ -732,7 +734,7 @@ D_RT verify_file(delta *del){//检验delta文件的magic bytes和版本信息，
 			return D_ERROR;
 		}
 	}
-	del->DELTA_SIZE=file_size;
+	del->DELTA_SIZE=file_size+18;
 	for (x=0;x<16;x++){
 		md5_from_delta[x]=read_byte(delfile);
 	}
@@ -753,7 +755,8 @@ D_RT verify_file(delta *del){//检验delta文件的magic bytes和版本信息，
 		}
 	}
 	del->SOURCE_SIZE=file_size;
-
+	del->DELTA_FILE.FileBeginAddr=del->DELTA_FILE.FileBeginAddr+del->DELTA_FILE.FileOffset;
+	del->DELTA_FILE.FileOffset=0;
     if(read_byte(delfile)!=0xd6)return D_ERROR;
     if(read_byte(delfile)!=0xc3)return D_ERROR;
     if(read_byte(delfile)!=0xc4)return D_ERROR;
