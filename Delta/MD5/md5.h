@@ -1,4 +1,4 @@
-﻿/**
+/**
   ******************************************************************************
   * @file    md5.h
   * @author  Techphant Team
@@ -25,7 +25,7 @@
 #define R_memcpy(x, y, z) memcpy(x, y, z)
 #define R_memcmp(x, y, z) memcmp(x, y, z)
 
-typedef unsigned long UINT4;
+typedef unsigned int UINT4;
 typedef unsigned char *POINTER;
 
 /* MD5 context. */
