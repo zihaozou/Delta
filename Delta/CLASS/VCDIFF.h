@@ -32,7 +32,7 @@ SOFTWARE.
 #define VCDIFF_h
 #include "type_def.h"
 #include "INSTRUCTION.h"
-
+#include "SOURCE.h"
 
 #define write_integer(file,integer) _write_integer(file,integer,0)
 
@@ -185,4 +185,5 @@ void vcd_test(void);
 D_RT cache_init(addr_cache *cc);
 D_RT cache_update(addr_cache *cc,uint64_t addr);
 uint32_t count_int64_len(uint64_t integer);
+D_RT delta_md5(FILE *delta);
 #endif /* VCDIFF_h */

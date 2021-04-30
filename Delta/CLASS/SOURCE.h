@@ -33,6 +33,7 @@ SOFTWARE.
 
 #include <stdio.h>
 #include "type_def.h"
+#include "md5.h"
 /*
  typedef struct _source{
      struct _source_file *source_file;
@@ -72,4 +73,5 @@ D_RT get_block(source *src,uint32_t blk_no);
 D_RT get_n_char_at(source *src,uint32_t position, char buffer[]);
 D_RT clean_source(source *src);
 void add_position(source_hash *h,int x);
+void source_md5(source *src,unsigned char md5[16]);
 #endif /* SOURCE_h */

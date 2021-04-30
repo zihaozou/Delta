@@ -393,5 +393,23 @@ D_RT clean_source(source *src){
     return D_OK;
 }
 
+void source_md5(source *src,unsigned char md5[16]){
+	unsigned char check_buff[2048];
+	uint32_t calculated=0;
+	FILE *src_file=src->SOURCE_FILE->FILE_INSTANCE;
+	size_t src_size=src->SOURCE_FILE->FILE_SIZE;
+	MD5_CTX md5_checker;
+	MD5Init(&md5_checker);
+	rewind(src_file);
+	while(calculated<src_size){
+		uint32_t copy_size=delta_min(src_size-calculated,2048);
+        fread((void *)check_buff, 1, copy_size, src_file);
+        MD5Update(&md5_checker,check_buff,copy_size);
+        calculated+=copy_size;
+	}
+	MD5Final(md5,&md5_checker);
+	rewind(src_file);
+	return;
 
+} 
 

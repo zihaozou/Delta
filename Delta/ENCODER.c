@@ -60,7 +60,11 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
         window_packer(output, Stream);
         if(mode!=1)rearrange_source_file(Stream, add_size);
     }
-    fclose(output);
+	if(delta_md5(output)==D_ERROR){
+		fclose(output);
+		remove(delta_name);
+		return;
+	}else fclose(output);
     delete_inst_list(Target->TARGET_WINDOW->INSTRUCTION);
     if(mode==3){
         printf("\nMODE 3: required flash space=%zu\n",Stream->SOURCE->SOURCE_FILE->FILE_SIZE);
@@ -96,3 +100,7 @@ uint32_t mode3_backoff(stream *Stream){
     rearrange_source_file(Stream,total_bf_size);
     return total_bf_size;
 }
+
+
+
+

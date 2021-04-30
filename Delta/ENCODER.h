@@ -33,5 +33,6 @@ SOFTWARE.
 
 #include "type_def.h"
 #include "STREAM.h"
+#include "md5.h"
 void ENCODER(const char *source_name,const char *target_name,const char *delta_name,int mode,int page_size);
 #endif /* ENCODER_h */
