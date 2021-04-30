@@ -52,11 +52,7 @@
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "-d"
-            isEnabled = "YES">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "delta_3.bin"
+            argument = "-e"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
@@ -64,11 +60,19 @@
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "updated.bin"
+            argument = "unbm_R2.bin"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "1024"
+            argument = "delta_3.bin"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "-3"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "2048"
             isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>

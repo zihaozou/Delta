@@ -402,7 +402,7 @@ void source_md5(source *src,unsigned char md5[16]){
 	MD5Init(&md5_checker);
 	rewind(src_file);
 	while(calculated<src_size){
-		uint32_t copy_size=delta_min(src_size-calculated,2048);
+		uint32_t copy_size=delta_min((uint32_t)src_size-calculated,2048);
         fread((void *)check_buff, 1, copy_size, src_file);
         MD5Update(&md5_checker,check_buff,copy_size);
         calculated+=copy_size;

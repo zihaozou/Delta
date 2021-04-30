@@ -48,11 +48,11 @@ D_RT header_packer(FILE *delta,stream *stm){
 	byte blank_space[16]={0};
     byte temp=0x00;
     rewind(delta);
-	write_bytes(delta,blank_space,16);
+	write_bytes(delta,&blank_space[0],16);
 	write_byte(delta, 0x00);//delta文件md5预留空间
 	write_byte(delta, 0x00);//delta文件大小预留空间
-	source_md5(stm->SOURCE->SOURCE_FILE->FILE_INSTANCE,blank_space);
-	write_bytes(delta,blank_space,16);
+	source_md5(stm->SOURCE,blank_space);
+	write_bytes(delta,&blank_space[0],16);
 	write_integer(delta, stm->SOURCE->SOURCE_FILE->FILE_SIZE); 	
     write_byte(delta, 0xd6);//V
     write_byte(delta, 0xc3);//C
@@ -113,14 +113,14 @@ D_RT delta_md5(FILE *delta){
     fseek(delta,18,SEEK_SET);
     MD5Init(&md5_checker);
     while(calculated<size){
-        uint32_t copy_size=delta_min(size-calculated,2048);
+        uint32_t copy_size=delta_min((uint32_t)size-calculated,2048);
         fread((void *)check_buff, 1, copy_size, delta);
         MD5Update(&md5_checker,check_buff,copy_size);
         calculated+=copy_size;
     }
     MD5Final(md5,&md5_checker);
     fseek(delta,0,SEEK_SET);
-    write_bytes(delta,check_buff,16);
+    write_bytes(delta,(char *)&md5[0],16);
     write_byte(delta,(size&0xff00)>>8);
     write_byte(delta,size&0xff);
     return D_OK;
