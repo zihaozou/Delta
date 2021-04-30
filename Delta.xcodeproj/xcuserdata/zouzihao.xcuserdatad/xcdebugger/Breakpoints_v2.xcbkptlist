@@ -56,7 +56,7 @@
          BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
          <BreakpointContent
             uuid = "35B76173-AB04-4135-9277-E846616A6634"
-            shouldBeEnabled = "No"
+            shouldBeEnabled = "Yes"
             ignoreCount = "0"
             continueAfterRunningActions = "No"
             filePath = "Delta/DECODER.c"
@@ -81,6 +81,22 @@
             startingLineNumber = "63"
             endingLineNumber = "63"
             landmarkName = "ENCODER(source_name, target_name, delta_name, mode, page_size)"
+            landmarkType = "9">
+         </BreakpointContent>
+      </BreakpointProxy>
+      <BreakpointProxy
+         BreakpointExtensionID = "Xcode.Breakpoint.FileBreakpoint">
+         <BreakpointContent
+            uuid = "05CB1FDA-7B0B-4092-8367-BAC0553CBCBB"
+            shouldBeEnabled = "Yes"
+            ignoreCount = "0"
+            continueAfterRunningActions = "No"
+            filePath = "Delta/DECODER.c"
+            startingColumnNumber = "9223372036854775807"
+            endingColumnNumber = "9223372036854775807"
+            startingLineNumber = "527"
+            endingLineNumber = "527"
+            landmarkName = "verify_file(Del)"
             landmarkType = "9">
          </BreakpointContent>
       </BreakpointProxy>

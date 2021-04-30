@@ -34,7 +34,7 @@ SOFTWARE.
 #include "type_def.h"
 #include "STREAM.h"
 #include "VCDIFF.h"
-
+#include "md5.h"
 
 void test_read_integer(void);
 void DECODER(const char *delta_name,const char *source_name,const char *updated_name,int page_size);

@@ -405,10 +405,10 @@ void DECODER(const char *delta_name,const char *source_name,const char *updated_
         exit(0);
     }
     Del.UPDATED_SIZE=read_integer(Del.FILE_INSTANCE);
-    if(Del.SOURCE_SIZE!=read_integer(Del.FILE_INSTANCE)){
-        printf("\nERROR different source size\n");
-        exit(0);
-    }
+    //if(Del.SOURCE_SIZE!=read_integer(Del.FILE_INSTANCE)){
+        //printf("\nERROR different source size\n");
+        //exit(0);
+    //}
     set_HDR(&Del);
     if(Del.DECODE_MODE!=1){
         temp=fopen("temp.bin", "wb+");
@@ -468,8 +468,53 @@ void init_delta(delta *del,const char *delta_name,const char *updated_name,const
 
 
 D_RT verify_file(delta *Del){
+    uint8_t check_buff[2048];
+    uint8_t x;
+    uint8_t md5_from_delta[16];
+    uint8_t md5_calculated[16];
+    uint32_t read_size;
+    MD5_CTX md5_checker;
+    uint32_t calculated=0;
     byte temp;
     FILE *delfile=Del->FILE_INSTANCE;
+    for (x=0;x<16;x++){
+        md5_from_delta[x]=read_byte(delfile);
+    }
+    uint32_t file_size=(read_byte(delfile)<<8)|read_byte(delfile);
+    MD5Init(&md5_checker);
+    while(calculated<file_size){
+        read_size=delta_min(file_size-calculated,2048);
+        fread((void *)&check_buff[0], 1, read_size, delfile);
+        MD5Update(&md5_checker,&check_buff[0],read_size);
+        calculated+=read_size;
+    }
+    MD5Final(md5_calculated, &md5_checker);
+    for(x=0;x<16;x++){
+        if(md5_calculated[x]!=md5_from_delta[x]){
+            return D_ERROR;
+        }
+    }
+    //Del->FILE_SIZE=file_size;
+    fseek(delfile, 18, SEEK_SET);
+    MD5Init(&md5_checker);
+    for (x=0;x<16;x++){
+        md5_from_delta[x]=read_byte(delfile);
+    }
+    file_size=(uint32_t)read_integer(delfile);
+    calculated=0;
+    while(calculated<file_size){
+        read_size=delta_min(file_size-calculated,2048);
+        fread((void *)&check_buff[0], 1, read_size, Del->SOURCE_FILE);
+        MD5Update(&md5_checker,&check_buff[0],read_size);
+        calculated+=read_size;
+    }
+    MD5Final(md5_calculated, &md5_checker);
+    for(x=0;x<16;x++){
+        if(md5_calculated[x]!=md5_from_delta[x]){
+            return D_ERROR;
+        }
+    }
+    rewind(Del->SOURCE_FILE);
     fread(&temp, 1, 1, delfile);
     if(temp!=0xd6)return D_ERROR;
     fread(&temp, 1, 1, delfile);
