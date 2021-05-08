@@ -84,15 +84,15 @@ D_RT DECODER(){
 			&Del.MOVE_DATA_BUFFER[(left_mark==copy_size)?DEFAULT_UPDATED_WIN_SIZE-copy_size:0], copy_size );
 			dest_page=Del.SOURCE_FILE.FileBeginAddr+((extended_size+(DEFAULT_UPDATED_WIN_SIZE-1))
 			/DEFAULT_UPDATED_WIN_SIZE-1)*DEFAULT_UPDATED_WIN_SIZE;
-			erase_page_at ( dest_page, DEFAULT_UPDATED_WIN_SIZE );
-			write_page_at ( dest_page, Del.MOVE_DATA_BUFFER, (left_mark==copy_size)?DEFAULT_UPDATED_WIN_SIZE:copy_size );
+			if(!erase_page_at ( dest_page, DEFAULT_UPDATED_WIN_SIZE ))return D_ERROR;
+			if(!write_page_at ( dest_page, Del.MOVE_DATA_BUFFER, (left_mark==copy_size)?DEFAULT_UPDATED_WIN_SIZE:copy_size ))return D_ERROR;
 			left_mark-=copy_size;
 			extended_size-=copy_size;
 		}
 		memset(Del.MOVE_DATA_BUFFER,0,DEFAULT_UPDATED_WIN_SIZE);
 		for(x=Del.SOURCE_FILE.FileBeginAddr;x<dest_page;x+=DEFAULT_UPDATED_WIN_SIZE){
-			erase_page_at ( x, DEFAULT_UPDATED_WIN_SIZE );
-			write_page_at(x,Del.MOVE_DATA_BUFFER,DEFAULT_UPDATED_WIN_SIZE);
+			if(!erase_page_at ( x, DEFAULT_UPDATED_WIN_SIZE ))return D_ERROR;
+			if(!write_page_at(x,Del.MOVE_DATA_BUFFER,DEFAULT_UPDATED_WIN_SIZE))return D_ERROR;
 		}
 		Del.SOURCE_SIZE+=add_size;
 	}
@@ -639,10 +639,8 @@ D_RT decode_window(delta *del){
                 break;
         }
     }
-	if(erase_page_at ( del->UPDATED_FILE.FileBeginAddr+del->UPDATED_FILE.FileOffset, DEFAULT_UPDATED_WIN_SIZE )==0){
-		return D_ERROR;
-	}
-    write_data(&del->UPDATED_FILE,del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN);
+	if(!erase_page_at ( del->UPDATED_FILE.FileBeginAddr+del->UPDATED_FILE.FileOffset, DEFAULT_UPDATED_WIN_SIZE ))return D_ERROR;
+    if(!write_data(&del->UPDATED_FILE,del->UPDATED_BUFFER, del->LENGTH_TARGET_WIN))return D_ERROR;
 	delfile->FileOffset=del->NEXT_WIN_POSI;
     del->CURRENT_WIN_POSI=del->NEXT_WIN_POSI;
     return D_OK;
@@ -756,6 +754,7 @@ D_RT verify_file(delta *del){//检验delta文件的magic bytes和版本信息，
 	}
 	del->SOURCE_SIZE=file_size;
 	del->DELTA_FILE.FileBeginAddr=del->DELTA_FILE.FileBeginAddr+del->DELTA_FILE.FileOffset;
+	del->DELTA_SIZE-=del->DELTA_FILE.FileOffset;
 	del->DELTA_FILE.FileOffset=0;
     if(read_byte(delfile)!=0xd6)return D_ERROR;
     if(read_byte(delfile)!=0xc3)return D_ERROR;
@@ -788,7 +787,7 @@ D_RT finalizer(delta *del){
 		page+=DEFAULT_UPDATED_WIN_SIZE){
 		erase_page_at(page,DEFAULT_UPDATED_WIN_SIZE);
 	}
-	board_oriented_finalizer(del->DELTA_FILE.FileBeginAddr,
+	board_oriented_finalizer(del->DECODE_MODE, del->DELTA_FILE.FileBeginAddr,
 	del->DELTA_SIZE,
 	del->UPDATED_FILE.FileBeginAddr,
 	del->UPDATED_SIZE);

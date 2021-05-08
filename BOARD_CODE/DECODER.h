@@ -34,6 +34,10 @@
 #define GET_SOURCE_SIZE()				DEBUG_SOURCE_SIZE
 #define FLASH_ADDR_BASE					FLASH_BASE_ADDR
 #define FLASH_SIZE						FLASH_MAX_SIZE
+
+static void read_error_handler(void){
+	__NOP;
+}
 /*****************************************************************************
  * 函 数 名  : erase_page_at
  * 负 责 人  : 邹子豪
@@ -80,7 +84,9 @@ static uint32_t write_flash_at(uint32_t addr, uint8_t *buff, uint32_t len){
  * 其    它  : 
 *****************************************************************************/
 static uint32_t read_flash_at(uint32_t addr, uint8_t *buff, uint32_t len){
-	return readFlashData ( addr, buff, len );
+	uint32_t rt=readFlashData ( addr, buff, len );
+	if(!rt)read_error_handler();
+	return rt;
 }
 /*****************************************************************************
  * 函 数 名  : board_oriented_finalizer
@@ -97,7 +103,7 @@ static uint32_t read_flash_at(uint32_t addr, uint8_t *buff, uint32_t len){
  * 调用关系  :
  * 其    它  : 
 *****************************************************************************/
-static void board_oriented_finalizer(uint32_t delta_addr,
+static void board_oriented_finalizer(uint8_t mode, uint32_t delta_addr,
 			uint32_t delta_size,
 			uint32_t updated_addr,
 			uint32_t updated_size
