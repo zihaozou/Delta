@@ -33,6 +33,7 @@ SOFTWARE.
 uint32_t mode3_backoff(stream *Stream);
 void create_alternate_src(source *src);
 void ENCODER(const char *source_name,const char *target_name,const char *delta_name,int mode,int page_size){
+    size_t srcsize,delsize;
     FILE *output=fopen(delta_name, "wb+");
     uint32_t add_size=0;
     stream *Stream=create_stream();
@@ -40,6 +41,7 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
     source *Source=create_source();
     Stream->ENCODE_MODE=mode;
     set_src_file(Source, source_name);
+    srcsize=Source->SOURCE_FILE->FILE_SIZE;
     if(mode!=1){
         create_alternate_src(Source);
     }
@@ -64,11 +66,15 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
 		fclose(output);
 		remove(delta_name);
 		return;
-	}else fclose(output);
+	}
     delete_inst_list(Target->TARGET_WINDOW->INSTRUCTION);
+    fseek(output, 0, SEEK_END);
+    delsize=ftell(output);
+    printf("总结：\n源文件大小: %zuBytes\n目标文件大小: %zuBytes\n差分文件大小: %zuBytes\n",srcsize,Target->TARGET_FILE->FILE_SIZE,delsize);
     if(mode==3){
-        printf("\nMODE 3: required flash space=%zu\n",Stream->SOURCE->SOURCE_FILE->FILE_SIZE);
+        printf("模式3单片机预留空间需大于：%zuBytes\n",Stream->SOURCE->SOURCE_FILE->FILE_SIZE);
     }
+    fclose(output);
     clean_source(Source);
     if(mode!=1){
         remove("temp.bin");

@@ -486,7 +486,7 @@ D_RT verify_file(delta *Del){
         read_size=delta_min(file_size-calculated,2048);
         fread((void *)&check_buff[0], 1, read_size, delfile);
         MD5Update(&md5_checker,&check_buff[0],read_size);
-        MD5Final(md5_calculated, &md5_checker);
+//        MD5Final(md5_calculated, &md5_checker);
         calculated+=read_size;
     }
     MD5Final(md5_calculated, &md5_checker);
