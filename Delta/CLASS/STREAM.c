@@ -78,7 +78,9 @@ D_RT init_encode(stream *stm){
 static source_hash *small_hashtable=NULL;
 //TODO: 还需搞清large match和small match之间的最优解原理
 D_RT match(stream *stm){
+#ifdef VERBOSE
     printf("\nSTRING MATCH: initial entry: %llu\n",stm->TARGET->TARGET_WINDOW->START_POSITION);
+#endif
     char *tgt_buffer=stm->TARGET->TARGET_WINDOW->BUFFER;
     //uint64_t curr_posi=stm->INPUT_POSITION;
     uint16_t tgtcrc;
@@ -122,7 +124,7 @@ D_RT match(stream *stm){
         
         /*MARK: small match*/
         //通常window窗口都很小
-#define SMALL_HASH_LEN 4
+
         if(stm->INPUT_REMAINING>=SMALL_HASH_LEN){
             smallcrc=crc16speed(0, &tgt_buffer[stm->INPUT_POSITION], SMALL_HASH_LEN);
             HASH_FIND(hh, small_hashtable, &smallcrc, 2, s);

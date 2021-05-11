@@ -62,6 +62,10 @@ D_RT set_tgt_file(target *tgt,const char *filename){
         return D_ERROR;
     }
     FILE *tgtfile=fopen(filename, "r+b");
+    if(tgtfile==NULL){
+        printf("\nERROR: target file doesn't exist\n");
+        return D_ERROR;
+    }
     fseek(tgtfile,0,SEEK_END);
     size_t size=ftell(tgtfile);
     rewind(tgtfile);

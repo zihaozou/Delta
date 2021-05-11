@@ -89,6 +89,7 @@ D_RT add_instructions(instruction *inst, instruction_node *inst_node,int number)
             }
         }
         inst->INSTRUCTION_COUNT++;//增进指令计数
+#ifdef VERBOSE
         if(inst_node->INST_TYPE==COPY){
             printf("\n*******************\nNEW INSTRUCTION: a new instruction has added\nTYPE:COPY\nPOSITION:%llu\nSIZE:%llu\nADDR:%llu\n*******************\n",inst_node->POSITION,inst_node->SIZE,
                    inst_node->DATA_or_ADDR.addr);
@@ -98,7 +99,7 @@ D_RT add_instructions(instruction *inst, instruction_node *inst_node,int number)
         }else{
             printf("\n*******************\nNEW INSTRUCTION: a new instruction has added\nTYPE:ADD or RUN\n*******************\n");
         }
-        
+#endif
         inst_node=inst_node->NEXT;//进入下一新指令
         x++;//增进x
     }

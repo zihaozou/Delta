@@ -51,6 +51,7 @@ SOFTWARE.
 #define SOURCE_WINDOW_SIZE 4096
 #define MAX_BLOCK_NUMBER 8
 #define CRC_LEN 8
+#define SMALL_HASH_LEN 4
 //#define DEFAULT_TARGET_WIN_SIZE 2048//原来2048
 #define s_near 4
 #define s_same 3
@@ -62,7 +63,10 @@ SOFTWARE.
 #endif
 #define VCD_SELF 0
 #define VCD_HERE 1
-
+#define MERGE_ADD_MIN_SIZE 1
+#define MERGE_ADD_MAX_SIZE MERGE_ADD_MIN_SIZE+3
+#define MERGE_COPY_MIN_SIZE 7
+#define MERGE_COPY_MAX_SIZE MERGE_COPY_MIN_SIZE+2
 
 
 typedef unsigned char byte;
@@ -225,8 +229,9 @@ typedef struct _code_node{
     byte CODE;
     uint32_t SIZE1;
     uint32_t SIZE2;
-    data_addr DATAADDR;
-    uint32_t INST_SIZE;
+    data_addr DATAADDR1;
+    data_addr DATAADDR2;
+    //uint32_t INST_SIZE;
     //uint32_t DATA_ADDR_SIZE;
     
     

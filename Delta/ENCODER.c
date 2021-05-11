@@ -34,22 +34,22 @@ uint32_t mode3_backoff(stream *Stream);
 void create_alternate_src(source *src);
 void ENCODER(const char *source_name,const char *target_name,const char *delta_name,int mode,int page_size){
     size_t srcsize,delsize;
-    FILE *output=fopen(delta_name, "wb+");
+    FILE *output;
     uint32_t add_size=0;
     stream *Stream=create_stream();
     target *Target=create_target(page_size);
     source *Source=create_source();
     Stream->ENCODE_MODE=mode;
-    set_src_file(Source, source_name);
+    if(set_src_file(Source, source_name)==D_ERROR || set_tgt_file(Target, target_name)==D_ERROR)
+        return;
     srcsize=Source->SOURCE_FILE->FILE_SIZE;
-    if(mode!=1){
+    if(mode!=1)
         create_alternate_src(Source);
-    }
     init_window(Source);
     global_source_hash(Source);
-    set_tgt_file(Target, target_name);
     add_target(Stream, Target);
     add_source(Stream, Source);
+    output=fopen(delta_name, "wb+");
     header_packer(output, Stream);
     if (mode==3){
         add_size=mode3_backoff(Stream);
@@ -70,6 +70,7 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
     delete_inst_list(Target->TARGET_WINDOW->INSTRUCTION);
     fseek(output, 0, SEEK_END);
     delsize=ftell(output);
+    printf("\nSUCCEED\n");
     printf("总结：\n源文件大小: %zuBytes\n目标文件大小: %zuBytes\n差分文件大小: %zuBytes\n",srcsize,Target->TARGET_FILE->FILE_SIZE,delsize);
     if(mode==3){
         printf("模式3单片机预留空间需大于：%zuBytes\n",Stream->SOURCE->SOURCE_FILE->FILE_SIZE);
@@ -80,6 +81,7 @@ void ENCODER(const char *source_name,const char *target_name,const char *delta_n
         remove("temp.bin");
     }
     clean_target(Target);
+    
 }
 
 void create_alternate_src(source *src){

@@ -233,6 +233,10 @@ D_RT set_src_file(source *src, const char *file_name){
         return D_ERROR;
     }
     FILE *srcfile=fopen(file_name, "r+b");
+    if(srcfile==NULL){
+        printf("\nERROR: source file doesn't exist\n");
+        return D_ERROR;
+    }
     fseek(srcfile,0,SEEK_END);
     size_t size=ftell(srcfile);
     rewind(srcfile);

@@ -42,7 +42,7 @@ static D_RT write_byte(FILE * file,byte Byte);
 static D_RT write_bytes(FILE * file,char *buffer,int size);
 static void content_writer(FILE *file,code *cod);
 static void win_header_writer(FILE *file,code *cod);
-
+D_RT merge_code(code *cod);
 
 D_RT header_packer(FILE *delta,stream *stm){
 	byte blank_space[16]={0};
@@ -80,6 +80,7 @@ void mode3_add_size_packer(FILE *delta,stream *stm,uint32_t add_size){
 D_RT window_packer(FILE *delta,stream *stm){
     code *cod=create_code(stm);
     code_instruction(stm->TARGET->TARGET_WINDOW->INSTRUCTION, cod);
+    merge_code(cod);
     win_header_writer(delta,cod);
     content_writer(delta,cod);
     clean_code(cod);
@@ -134,7 +135,7 @@ static D_RT add_single_code(code *cod,byte instcode,uint32_t size1,data_addr dat
     new->CODE=instcode;
     new->SIZE1=size1;
     new->SIZE2=0;
-    new->DATAADDR=dataaddr;
+    new->DATAADDR1=dataaddr;
     new->NEXT=NULL;
     //new->DATA_ADDR_SIZE=0;
     if(DeltaDefaultCodeTable[2][instcode]==0){
@@ -196,23 +197,31 @@ static D_RT code_instruction(instruction *inst,code *cod){
             local.addr=addr_encode(&cache, local.addr, curr_nd->POSITION+inst->LENGTH, &mode);
             instcode=19+mode*16+((curr_nd->SIZE<=18 && curr_nd->SIZE>=4)?curr_nd->SIZE-3:0);
             add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+#ifdef VERBOSE
             PRINT_DELTA(COPY,instcode);
+#endif
         }else if(curr_nd->INST_TYPE==RUN){
             local.data=curr_nd->DATA_or_ADDR.data;
             instcode=0;
             add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+#ifdef VERBOSE
             PRINT_DELTA(RUN,instcode);
+#endif
         }else if(curr_nd->INST_TYPE==ADD){
             local.data=curr_nd->DATA_or_ADDR.data;
             instcode=(curr_nd->SIZE>=1 && curr_nd->SIZE<=17)?curr_nd->SIZE+1:1;
             add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+#ifdef VERBOSE
             PRINT_DELTA(ADD,instcode);
+#endif
         }else if (curr_nd->INST_TYPE==SCOPY){
             local.addr=curr_nd->DATA_or_ADDR.addr+inst->LENGTH;
             local.addr=addr_encode(&cache, local.addr, curr_nd->POSITION+inst->LENGTH, &mode);
             instcode=19+mode*16+((curr_nd->SIZE<=18 && curr_nd->SIZE>=4)?curr_nd->SIZE-3:0);
             add_single_code(cod, instcode, (uint32_t)curr_nd->SIZE, local);
+#ifdef VERBOSE
             PRINT_DELTA(SCOPY,instcode);
+#endif
         }
         
         curr_nd=curr_nd->NEXT;
@@ -259,29 +268,38 @@ static D_RT write_bytes(FILE * file,char *buffer,int size){
 
 
 
-static void content_writer(FILE *file,code *cod){//先只考虑单指令
+static void content_writer(FILE *file,code *cod){//加入双指令
     code_node *curr=cod->HEAD;
     while(curr){
         if(DeltaDefaultCodeTable[0][curr->CODE]==ADD)
-        write_bytes(file,curr->DATAADDR.data,curr->SIZE1);
+            write_bytes(file,curr->DATAADDR1.data,curr->SIZE1);
         else if(DeltaDefaultCodeTable[0][curr->CODE]==RUN)
-            write_byte(file, curr->DATAADDR.data[0]);
+            write_byte(file, curr->DATAADDR1.data[0]);
+        if(DeltaDefaultCodeTable[1][curr->CODE]==ADD)
+            write_bytes(file,curr->DATAADDR2.data,curr->SIZE2);
         curr=curr->NEXT;
     }
     curr=cod->HEAD;
     while(curr){
         write_byte(file,curr->CODE);
         if(!DeltaDefaultCodeTable[2][curr->CODE])write_integer(file,curr->SIZE1);
-        //if(curr->SIZE2)write_byte(file,curr->SIZE2);
+        if(curr->CODE>162 && !DeltaDefaultCodeTable[3][curr->CODE])write_integer(file,curr->SIZE2);
         curr=curr->NEXT;
     }
     curr=cod->HEAD;
     while(curr){
         if(DeltaDefaultCodeTable[0][curr->CODE]==COPY){
             if(DeltaDefaultCodeTable[4][curr->CODE]<6){
-                write_integer(file, curr->DATAADDR.addr);
+                write_integer(file, curr->DATAADDR1.addr);
             }else{
-                write_byte(file, (byte)curr->DATAADDR.addr);
+                write_byte(file, (byte)curr->DATAADDR1.addr);
+            }
+        }
+        if(DeltaDefaultCodeTable[1][curr->CODE]==COPY){
+            if(DeltaDefaultCodeTable[5][curr->CODE]<6){
+                write_integer(file, curr->DATAADDR2.addr);
+            }else{
+                write_byte(file, (byte)curr->DATAADDR2.addr);
             }
         }
         curr=curr->NEXT;
@@ -348,8 +366,54 @@ uint32_t count_int64_len(uint64_t integer){
     }
     return len;
 }
+#define CHECK_DOUBLILITY1(this_code,next_code) \
+(DeltaDefaultCodeTable[0][this_code]==ADD && DeltaDefaultCodeTable[0][next_code]==COPY\
+ && DeltaDefaultCodeTable[2][this_code]<=MERGE_ADD_MAX_SIZE && DeltaDefaultCodeTable[2][this_code]>=MERGE_ADD_MIN_SIZE\
+ && DeltaDefaultCodeTable[2][next_code]<=MERGE_COPY_MAX_SIZE && DeltaDefaultCodeTable[2][next_code]>=MERGE_COPY_MIN_SIZE\
+ && DeltaDefaultCodeTable[2][next_code]<=MERGE_COPY_MAX_SIZE\
+ && DeltaDefaultCodeTable[4][next_code]<=5)
 
+#define CHECK_DOUBLILITY2(this_code,next_code) \
+(DeltaDefaultCodeTable[0][this_code]==ADD && DeltaDefaultCodeTable[0][next_code]==COPY\
+ && DeltaDefaultCodeTable[2][this_code]<=MERGE_ADD_MAX_SIZE && DeltaDefaultCodeTable[2][this_code]>=MERGE_ADD_MIN_SIZE\
+ && DeltaDefaultCodeTable[2][next_code]==MERGE_COPY_MIN_SIZE\
+ && DeltaDefaultCodeTable[4][next_code]>5)
 
+#define CHECK_DOUBLILITY3(this_code,next_code)\
+(DeltaDefaultCodeTable[0][this_code]==COPY && DeltaDefaultCodeTable[0][next_code]==ADD\
+ && DeltaDefaultCodeTable[2][this_code]==MERGE_COPY_MIN_SIZE\
+ && DeltaDefaultCodeTable[2][next_code]==MERGE_ADD_MIN_SIZE)
+D_RT merge_code(code *cod){
+    code_node *curr=cod->HEAD;
+    code_node *next;
+    while(curr){
+        next=curr->NEXT;
+        if(next){
+            if(CHECK_DOUBLILITY1(curr->CODE,next->CODE)){
+                curr->CODE=163+12*DeltaDefaultCodeTable[4][next->CODE]
+                +3*(DeltaDefaultCodeTable[2][curr->CODE]-MERGE_ADD_MIN_SIZE)
+                +(DeltaDefaultCodeTable[2][next->CODE]-MERGE_COPY_MIN_SIZE);
+            }else if(CHECK_DOUBLILITY2(curr->CODE,next->CODE)){
+                curr->CODE=235+4*(DeltaDefaultCodeTable[4][next->CODE]-6)
+                +DeltaDefaultCodeTable[2][curr->CODE]-MERGE_ADD_MIN_SIZE;
+            }else if(CHECK_DOUBLILITY3(curr->CODE,next->CODE)){
+                curr->CODE=247+DeltaDefaultCodeTable[4][curr->CODE];
+            }else{
+                curr=curr->NEXT;
+                continue;
+            }
+            curr->DATAADDR2=next->DATAADDR1;
+            curr->SIZE2=next->SIZE1;
+            if(next->NEXT)next->NEXT->PREV=curr;
+            curr->NEXT=next->NEXT;
+            cod->LEN_INST--;
+            free(next);
+        }
+        curr=curr->NEXT;
+    }
+    
+    return D_OK;
+}
 
 
 

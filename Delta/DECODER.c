@@ -96,7 +96,7 @@ D_RT init_source_lru(delta *del){
         fseek(del->SOURCE_FILE, del->SOURCE_SEGMENT_POSITION, SEEK_SET);
         size_t rsize=fread(del->SOURCE_BUFFER, 1, del->SOURCE_SEGMENT_LENGTH,del->SOURCE_FILE);
         if(rsize!=del->SOURCE_SEGMENT_LENGTH){
-            printf("\nERROR during read source segment\n");
+            printf("\nERROR: during read source segment\n");
             return D_ERROR;
         }
         del->BLOCK_COUNT=1;
@@ -113,7 +113,7 @@ D_RT init_source_lru(delta *del){
         fseek(del->SOURCE_FILE, del->SOURCE_SEGMENT_POSITION, SEEK_SET);
         size_t rsize=fread(del->SOURCE_BUFFER,1 , DECODE_SOURCE_SIZE,del->SOURCE_FILE);
         if(rsize!=DECODE_SOURCE_SIZE){
-            printf("\nERROR during read source segment\n");
+            printf("\nERROR: during read source segment\n");
             return D_ERROR;
         }
         uint64_t init_block_size=DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER;
@@ -204,15 +204,18 @@ D_RT decode_get_block(delta *del,uint32_t blk_no){
 }
 
 D_RT copy_data(delta *del,dposition decode_posi, dposition addr,dsize siz){
-    uint64_t init_blk_size=(del->BLOCK_COUNT==1)?del->SOURCE_SEGMENT_LENGTH:(DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER);
-    uint32_t blk_no=(uint32_t)addr/(init_blk_size);
-    uint32_t local_position=(uint32_t)addr%(init_blk_size);
+    uint64_t init_blk_size;
+    uint32_t blk_no;
+    uint32_t local_position;
     dsize data_remain;
     if(addr>=del->SOURCE_SEGMENT_LENGTH){//scopy
         for (int x=0; x<siz; x++) {
             del->UPDATED_BUFFER[decode_posi+x]=del->UPDATED_BUFFER[addr-del->SOURCE_SEGMENT_LENGTH+x];
         }
     }else{
+        init_blk_size=(del->BLOCK_COUNT==1)?del->SOURCE_SEGMENT_LENGTH:(DECODE_SOURCE_SIZE/DECODE_BLOCK_NUMBER);
+        blk_no=(uint32_t)addr/(init_blk_size);
+        local_position=(uint32_t)addr%(init_blk_size);
         while (siz) {//copy
             decode_get_block(del, blk_no);
             data_remain=del->CURRENT_BLOCK->DATA_SIZE-local_position;
@@ -347,6 +350,52 @@ D_RT decode_window(delta *del){
             default:
                 break;
         }
+        switch (DeltaDefaultCodeTable[1][instcode]) {
+            case COPY:
+                if(DeltaDefaultCodeTable[3][instcode]==0){
+                    size=read_integer_at(delfile, inst_posi);
+                    inst_posi=ftell(delfile);
+                }else{
+                    size=DeltaDefaultCodeTable[3][instcode];
+                }
+                //设置addr
+                mode=DeltaDefaultCodeTable[5][instcode];
+                if(mode==VCD_SELF){
+                    addr=read_integer_at(delfile, addr_posi);
+                    addr_posi=ftell(delfile);
+                }else if (mode==VCD_HERE){
+                    addr=curr_decode_position+del->SOURCE_SEGMENT_LENGTH-read_integer_at(delfile, addr_posi);
+                    addr_posi=ftell(delfile);
+                }else if((m=mode-2)>=0 && m<s_near){
+                    addr=cache.near[m]+read_integer_at(delfile, addr_posi);
+                    addr_posi=ftell(delfile);
+                }else{
+                    m=mode-(2+s_near);
+                    addr=cache.same[m*256+read_byte_at(delfile, addr_posi)];
+                    addr_posi=ftell(delfile);
+                }
+                cache_update(&cache, addr);
+                //读取数据
+                copy_data(del, curr_decode_position, addr, size);
+                curr_decode_position+=size;
+                break;
+            case ADD:
+                //设置size
+                if(DeltaDefaultCodeTable[3][instcode]==0){
+                    size=read_integer_at(delfile, inst_posi);
+                    inst_posi=ftell(delfile);
+                }else{
+                    size=DeltaDefaultCodeTable[3][instcode];
+                }
+                //读取数据
+                read_bytes_at(delfile, size, data_posi, &del->UPDATED_BUFFER[curr_decode_position]);
+                data_posi=ftell(delfile);
+                curr_decode_position+=size;
+                add_size+=size;
+                break;
+            default:
+                break;
+        }
     }
     if(del->DECODE_MODE!=1){
         fseek(del->SOURCE_FILE, del->TARGET_POSI, SEEK_SET);
@@ -401,14 +450,10 @@ void DECODER(const char *delta_name,const char *source_name,const char *updated_
     Del.UPDATED_WIN_SIZE=page_size;
     Del.UPDATED_BUFFER=(byte *)malloc(sizeof(byte)*page_size);
     if(verify_file(&Del)==D_ERROR){
-        printf("\nERROR delta file incorrect\n");
+        printf("\nERROR: delta file incorrect\n");
         exit(0);
     }
     Del.UPDATED_SIZE=read_integer(Del.FILE_INSTANCE);
-    //if(Del.SOURCE_SIZE!=read_integer(Del.FILE_INSTANCE)){
-        //printf("\nERROR different source size\n");
-        //exit(0);
-    //}
     set_HDR(&Del);
     if(Del.DECODE_MODE!=1){
         temp=fopen("temp.bin", "wb+");
@@ -448,7 +493,7 @@ void init_delta(delta *del,const char *delta_name,const char *updated_name,const
     //delta *Delta=(delta *)malloc(sizeof(delta));
     del->FILE_INSTANCE=fopen(delta_name, "rb+");
     if(del->FILE_INSTANCE==NULL){
-        printf("\nERROR during reading delta file\n");
+        printf("\nERROR: during reading delta file\n");
         exit(0);
     }
     fseek(del->FILE_INSTANCE, 0, SEEK_END);
@@ -457,7 +502,7 @@ void init_delta(delta *del,const char *delta_name,const char *updated_name,const
     del->UPDATED_FILE=fopen(updated_name, "wb+");
     del->SOURCE_FILE=fopen(source_name, "rb+");
     if(del->SOURCE_FILE==NULL){
-        printf("\nERROR during reading source file\n");
+        printf("\nERROR: during reading source file\n");
         exit(0);
     }
     fseek(del->SOURCE_FILE, 0, SEEK_END);
